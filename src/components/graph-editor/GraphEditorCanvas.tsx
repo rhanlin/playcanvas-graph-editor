@@ -1,49 +1,40 @@
-import React, { useCallback, type MouseEvent } from "react";
+import React from "react";
 import {
   ReactFlow,
   Background,
   Controls,
-  useReactFlow,
-  type Node,
+  MiniMap,
 } from "reactflow";
-
 import "reactflow/dist/style.css";
+
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
+import { EntityNode } from "./nodes/EntityNode";
+import { ScriptNode } from "./nodes/ScriptNode";
+
+const nodeTypes = {
+  entity: EntityNode,
+  script: ScriptNode,
+};
 
 export function GraphEditorCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, setNodes } =
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onEdgesDelete } =
     useGraphEditorStore();
-  const { getIntersectingNodes } = useReactFlow();
-
-  const onNodeDrag = useCallback(
-    (_: MouseEvent, node: Node) => {
-      const intersections = getIntersectingNodes(node).map((n) => n.id);
-
-      setNodes(
-        nodes.map((n) => ({
-          ...n,
-          className: intersections.includes(n.id) ? "highlight" : "",
-        }))
-      );
-    },
-    [nodes, getIntersectingNodes, setNodes]
-  );
 
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
+      nodeTypes={nodeTypes}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
-      onNodeDrag={onNodeDrag}
-      className="intersection-flow h-full"
-      minZoom={0.2}
-      maxZoom={4}
+      onConnect={onConnect}
+      onEdgesDelete={onEdgesDelete}
+      className="h-full bg-slate-900"
       fitView
-      selectNodesOnDrag={false}
     >
       <Background />
       <Controls />
+      <MiniMap />
     </ReactFlow>
   );
 }

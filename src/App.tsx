@@ -6,15 +6,21 @@ import type { GraphResponse, RuntimeMessage } from "@/types/messaging";
 import { sendRuntimeMessage } from "@/utils/runtime";
 import { ReactFlowProvider } from "reactflow";
 export default function App() {
-  const { entityName, isLoading, error, setGraphData, setLoading, setError } =
-    useGraphEditorStore((state) => ({
-      entityName: state.entityName,
-      isLoading: state.isLoading,
-      error: state.error,
-      setGraphData: state.setGraphData,
-      setLoading: state.setLoading,
-      setError: state.setError,
-    }));
+  const {
+    selectedEntityName,
+    isLoading,
+    error,
+    setGraphData,
+    setLoading,
+    setError,
+  } = useGraphEditorStore((state) => ({
+    selectedEntityName: state.selectedEntityName,
+    isLoading: state.isLoading,
+    error: state.error,
+    setGraphData: state.setGraphData,
+    setLoading: state.setLoading,
+    setError: state.setError,
+  }));
 
   const requestGraphData = useCallback(() => {
     setLoading(true);
@@ -41,7 +47,11 @@ export default function App() {
       return;
     }
 
+    // This handler now listens for messages from the content script,
+    // which are forwarded from the editor bridge.
     const handler = (message: RuntimeMessage) => {
+      // We listen for GRAPH_PUSH_DATA which is now sent on selection changes
+      // and initial load.
       if (message?.type !== "GRAPH_PUSH_DATA") {
         return;
       }
@@ -67,9 +77,9 @@ export default function App() {
         <div>
           <p className="text-lg font-semibold">PlayCanvas Visual Editor</p>
           <p className="text-sm text-slate-400">
-            {entityName
-              ? `Focused on: ${entityName}`
-              : "Select an entity in the editor"}
+            {selectedEntityName
+              ? `Focused on: ${selectedEntityName}`
+              : "Select an entity in the editor to see its name here"}
           </p>
         </div>
         <button

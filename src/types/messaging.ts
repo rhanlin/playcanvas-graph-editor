@@ -1,34 +1,40 @@
-export type GraphNodeType = "entity" | "script";
+export type GraphNodeType = "entity" | "script"; // This might expand later
 
-export interface GraphNodePayload {
-  id: string;
-  nodeType: GraphNodeType;
-  label: string;
-  position: { x: number; y: number };
-  scriptName?: string;
-  scriptAttributes?: Record<string, unknown>;
+export interface ComponentPayload {
+  [key: string]: any;
+  attributes?: Record<string, { type: string; value: any }>;
 }
 
-export interface GraphEdgePayload {
-  id: string;
-  source: string;
-  target: string;
+export interface EntityPayload {
+  guid: string;
+  name: string;
+  parentId: string | null;
+  children: string[];
+  components: Record<string, ComponentPayload>;
 }
 
-export interface GraphDataPayload {
-  entityName: string;
-  nodes: GraphNodePayload[];
-  edges: GraphEdgePayload[];
+export interface SceneGraphPayload {
+  rootGuid: string;
+  entities: Record<string, EntityPayload>;
+  selectedEntityName: string | null;
+}
+
+export interface UpdateAttributePayload {
+  entityGuid: string;
+  scriptName: string;
+  attributeName: string;
+  targetEntityGuid: string | null; // null to clear the attribute
 }
 
 export interface GraphResponse {
   success: boolean;
   error?: string;
-  data?: GraphDataPayload;
+  data?: SceneGraphPayload;
 }
 
 export type RuntimeMessage =
   | { type: "GRAPH_REQUEST_DATA" }
-  | { type: "GRAPH_RESPONSE_DATA"; payload: GraphDataPayload }
+  | { type: "GRAPH_RESPONSE_DATA"; payload: SceneGraphPayload }
   | { type: "GRAPH_ERROR"; error: string }
-  | { type: "GRAPH_PUSH_DATA"; payload: GraphResponse };
+  | { type: "GRAPH_PUSH_DATA"; payload: GraphResponse }
+  | { type: "GRAPH_UPDATE_ATTRIBUTE"; payload: UpdateAttributePayload };

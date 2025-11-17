@@ -1,33 +1,37 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 
-interface ScriptNodeData {
-  label: string;
-  scriptName?: string;
-  scriptAttributes?: Record<string, unknown>;
-}
-
-export const ScriptNode = memo(({ data }: NodeProps<ScriptNodeData>) => {
-  const attributeCount = data.scriptAttributes
-    ? Object.keys(data.scriptAttributes).length
-    : 0;
+export const ScriptNode = memo(({ data }: NodeProps) => {
+  const entityAttributes = Object.entries(data.attributes || {}).filter(
+    ([, attrData]) => attrData.type === "entity"
+  );
 
   return (
-    <div className="min-w-[220px] rounded-2xl bg-gradient-to-br from-pink-400 via-rose-500 to-purple-500 p-4 text-white shadow-2xl shadow-slate-900/40">
-      <div className="text-base font-semibold">📜 {data.label}</div>
-      <div className="text-xs text-white/80">
-        {attributeCount} attribute{attributeCount === 1 ? "" : "s"}
+    <div className="rounded-md border border-sky-500/50 bg-slate-700/80 px-4 py-2 shadow-sm backdrop-blur-sm">
+      <div className="font-semibold text-sky-300">{data.label}</div>
+      <div className="mt-2 flex flex-col gap-2">
+        {entityAttributes.length > 0 ? (
+          entityAttributes.map(([key], index) => (
+            <div
+              key={key}
+              className="relative flex items-center justify-between"
+            >
+              <span className="text-sm text-slate-300">{key}</span>
+              <Handle
+                type="source"
+                position={Position.Right}
+                id={key} // Crucial: id must match the attribute name for the edge to connect correctly
+                className="!bg-pink-500"
+                style={{ top: 10 + index * 20 }} // Simple vertical distribution
+              />
+            </div>
+          ))
+        ) : (
+          <div className="text-xs italic text-slate-400">
+            No entity attributes
+          </div>
+        )}
       </div>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{ background: "#fff" }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: "#fff" }}
-      />
     </div>
   );
 });
