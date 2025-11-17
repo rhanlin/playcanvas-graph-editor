@@ -30,6 +30,7 @@ export function GraphEditorCanvas() {
       onConnect={onConnect}
       onEdgesDelete={onEdgesDelete}
       className="h-full bg-slate-900"
+      connectionRadius={40}
       fitView
     >
       <Background />

@@ -6,6 +6,7 @@ import type {
   OnEdgesChange,
   OnConnect,
   Connection,
+  EdgeChange,
 } from "reactflow";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "reactflow";
 
@@ -21,7 +22,6 @@ interface GraphEditorState {
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
-  onEdgesDelete: (edges: Edge[]) => void;
   setGraphData: (payload: SceneGraphPayload) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
@@ -47,30 +47,44 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       nodes: applyNodeChanges(changes, get().nodes),
     });
   },
-  onEdgesChange: (changes) => {
+  onEdgesChange: (changes: EdgeChange[]) => {
+    // Handle edge deletion from within onEdgesChange
+    const deleteChange = changes.find(c => c.type === 'remove');
+    if (deleteChange) {
+      const edgeToRemove = get().edges.find(e => e.id === deleteChange.id);
+      if (edgeToRemove) {
+        const { source, sourceHandle } = edgeToRemove;
+        const [entityGuid, scriptName] = source.split("-");
+        
+        if (entityGuid && scriptName && sourceHandle) {
+          sendRuntimeMessage({
+            type: "GRAPH_UPDATE_ATTRIBUTE",
+            payload: {
+              entityGuid,
+              scriptName,
+              attributeName: sourceHandle,
+              targetEntityGuid: null, // Setting to null signifies deletion
+            },
+          });
+        }
+      }
+    }
+
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
   },
   onConnect: (connection: Connection) => {
     const { source, sourceHandle, target } = connection;
+    if (!source || !sourceHandle || !target) return;
 
-    // Guard against incomplete connections
-    if (!source || !sourceHandle || !target) {
-      return;
-    }
-
-    // The source ID is in the format "entityGuid-scriptName"
     const [entityGuid, scriptName] = source.split("-");
-    if (!entityGuid || !scriptName) {
-      console.error("Invalid source node ID on connection:", source);
-      return;
-    }
+    if (!entityGuid || !scriptName) return;
 
     // Optimistically update the UI
-    set({
-      edges: addEdge(connection, get().edges),
-    });
+    set((state) => ({
+      edges: addEdge({ ...connection, type: 'smoothstep', animated: true }, state.edges),
+    }));
 
     // Send the update to the editor
     sendRuntimeMessage({
@@ -80,29 +94,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         scriptName,
         attributeName: sourceHandle,
         targetEntityGuid: target,
-      },
-    });
-  },
-  onEdgesDelete: (edgesToDelete: Edge[]) => {
-    // For now, we only handle single edge deletion
-    const edge = edgesToDelete[0];
-    if (!edge) return;
-
-    const { source, sourceHandle } = edge;
-    const [entityGuid, scriptName] = source.split("-");
-
-    if (!entityGuid || !scriptName || !sourceHandle) {
-      console.error("Invalid edge for deletion:", edge);
-      return;
-    }
-
-    sendRuntimeMessage({
-      type: "GRAPH_UPDATE_ATTRIBUTE",
-      payload: {
-        entityGuid,
-        scriptName,
-        attributeName: sourceHandle,
-        targetEntityGuid: null, // Setting to null signifies deletion
       },
     });
   },

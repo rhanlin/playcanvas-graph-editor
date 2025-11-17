@@ -21,8 +21,8 @@ export const ScriptNode = memo(({ data }: NodeProps) => {
                 type="source"
                 position={Position.Right}
                 id={key} // Crucial: id must match the attribute name for the edge to connect correctly
-                className="!bg-pink-500"
-                style={{ top: 10 + index * 20 }} // Simple vertical distribution
+                className="!h-3 !w-3 !bg-pink-500"
+                style={{ top: "50%", transform: "translateY(-50%)" }}
               />
             </div>
           ))

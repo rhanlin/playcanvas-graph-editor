@@ -13,9 +13,9 @@ export const EntityNode = memo(({ data }: NodeProps<EntityNodeData>) => {
         Entity Node
       </div>
       <Handle
-        type="source"
-        position={Position.Right}
-        style={{ background: "#fff" }}
+        type="target"
+        position={Position.Left}
+        className="!h-4 !w-4 !bg-teal-500"
       />
     </div>
   );
