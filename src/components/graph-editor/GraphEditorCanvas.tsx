@@ -1,10 +1,5 @@
 import React from "react";
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MiniMap,
-} from "reactflow";
+import { ReactFlow, Background, Controls, MiniMap } from "reactflow";
 import "reactflow/dist/style.css";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
@@ -17,7 +12,7 @@ const nodeTypes = {
 };
 
 export function GraphEditorCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onEdgesDelete } =
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } =
     useGraphEditorStore();
 
   return (
@@ -28,7 +23,6 @@ export function GraphEditorCanvas() {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
-      onEdgesDelete={onEdgesDelete}
       className="h-full bg-slate-900"
       connectionRadius={40}
       fitView

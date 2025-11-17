@@ -138,12 +138,8 @@
       return { success: false, error: "PlayCanvas editor not detected" };
     }
 
-    // This should now be initialized, but we check just in case.
+    // Initialize the script map on the first run.
     if (!scriptNameToAssetIdMap) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[GraphBridge] createSceneGraphPayload called before script map was built."
-      );
       scriptNameToAssetIdMap = buildScriptNameMap();
     }
 

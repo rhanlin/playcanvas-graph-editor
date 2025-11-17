@@ -33,7 +33,6 @@ interface GraphEditorState {
 const ENTITY_NODE_WIDTH = 250;
 const SCRIPT_NODE_WIDTH = 200;
 const HORIZONTAL_SPACING = 100;
-const VERTICAL_SPACING = 50;
 const SCRIPT_VERTICAL_OFFSET = 60;
 
 export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
@@ -48,28 +47,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     });
   },
   onEdgesChange: (changes: EdgeChange[]) => {
-    // Handle edge deletion from within onEdgesChange
-    const deleteChange = changes.find(c => c.type === 'remove');
-    if (deleteChange) {
-      const edgeToRemove = get().edges.find(e => e.id === deleteChange.id);
-      if (edgeToRemove) {
-        const { source, sourceHandle } = edgeToRemove;
-        const [entityGuid, scriptName] = source.split("-");
-        
-        if (entityGuid && scriptName && sourceHandle) {
-          sendRuntimeMessage({
-            type: "GRAPH_UPDATE_ATTRIBUTE",
-            payload: {
-              entityGuid,
-              scriptName,
-              attributeName: sourceHandle,
-              targetEntityGuid: null, // Setting to null signifies deletion
-            },
-          });
-        }
-      }
-    }
-
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
@@ -81,12 +58,13 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     const [entityGuid, scriptName] = source.split("-");
     if (!entityGuid || !scriptName) return;
 
-    // Optimistically update the UI
     set((state) => ({
-      edges: addEdge({ ...connection, type: 'smoothstep', animated: true }, state.edges),
+      edges: addEdge(
+        { ...connection, type: "smoothstep", animated: true },
+        state.edges
+      ),
     }));
 
-    // Send the update to the editor
     sendRuntimeMessage({
       type: "GRAPH_UPDATE_ATTRIBUTE",
       payload: {
@@ -102,26 +80,20 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
 
-    // Basic grid layout - can be replaced with a proper algorithm later
-    const columns = Math.ceil(Math.sqrt(Object.keys(entities).length));
+    const columns = Math.ceil(Math.sqrt(Object.keys(entities).length) || 1);
     let col = 0;
     let row = 0;
 
     Object.values(entities).forEach((entity) => {
-      // Create Entity Node
       newNodes.push({
         id: entity.guid,
         type: "entity",
         position: {
           x: col * (ENTITY_NODE_WIDTH + HORIZONTAL_SPACING),
-          y: row * (SCRIPT_VERTICAL_OFFSET * 4), // Approximate height for layout
+          y: row * (SCRIPT_VERTICAL_OFFSET * 4),
         },
-        data: {
-          label: entity.name,
-        },
-        style: {
-          width: ENTITY_NODE_WIDTH,
-        },
+        data: { label: entity.name },
+        style: { width: ENTITY_NODE_WIDTH },
       });
 
       col++;
@@ -130,7 +102,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         row++;
       }
 
-      // Create Script Nodes and Edges for the current entity
       const scriptComponent = entity.components?.script;
       if (scriptComponent?.scripts) {
         let scriptIndex = 0;
@@ -140,33 +111,25 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
             newNodes.push({
               id: scriptNodeId,
               type: "script",
-              position: {
-                x: 10,
-                y: SCRIPT_VERTICAL_OFFSET + scriptIndex * 80,
-              },
+              position: { x: 10, y: SCRIPT_VERTICAL_OFFSET + scriptIndex * 80 },
               parentNode: entity.guid,
-              extent: "parent",
               data: {
                 label: scriptName,
                 attributes: scriptData.attributes || {},
               },
-              style: {
-                width: SCRIPT_NODE_WIDTH,
-              },
+              style: { width: SCRIPT_NODE_WIDTH },
             });
             scriptIndex++;
 
-            // Create edges for entity-type attributes
             if (scriptData.attributes) {
               Object.entries(scriptData.attributes).forEach(
                 ([attrName, attrData]) => {
-                  // NEW: Precisely check for the 'entity' type
                   if (attrData.type === "entity" && attrData.value) {
                     newEdges.push({
                       id: `${scriptNodeId}-${attrName}-${attrData.value}`,
                       source: scriptNodeId,
-                      sourceHandle: attrName, // Connect from the specific attribute
-                      target: attrData.value, // Connect to the target entity node
+                      sourceHandle: attrName,
+                      target: attrData.value,
                       type: "smoothstep",
                       animated: true,
                     });
