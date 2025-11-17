@@ -2,7 +2,7 @@ import { useCallback, useEffect } from "react";
 
 import { GraphEditorCanvas } from "@/components/graph-editor/GraphEditorCanvas";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
-import type { GraphResponse } from "@/types/messaging";
+import type { GraphResponse, RuntimeMessage } from "@/types/messaging";
 import { sendRuntimeMessage } from "@/utils/runtime";
 
 export default function App() {
@@ -34,6 +34,31 @@ export default function App() {
   useEffect(() => {
     requestGraphData();
   }, [requestGraphData]);
+
+  useEffect(() => {
+    if (typeof chrome === "undefined" || !chrome.runtime?.onMessage) {
+      return;
+    }
+
+    const handler = (message: RuntimeMessage) => {
+      if (message?.type !== "GRAPH_PUSH_DATA") {
+        return;
+      }
+
+      const payload = message.payload;
+      if (!payload.success || !payload.data) {
+        setError(payload.error ?? "Unable to load graph data");
+        return;
+      }
+
+      setGraphData(payload.data);
+    };
+
+    chrome.runtime.onMessage.addListener(handler);
+    return () => {
+      chrome.runtime?.onMessage?.removeListener(handler);
+    };
+  }, [setGraphData, setError]);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">

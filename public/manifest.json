@@ -13,10 +13,21 @@
   "host_permissions": ["https://playcanvas.com/*", "http://playcanvas.com/*"],
   "content_scripts": [
     {
-      "matches": ["https://playcanvas.com/editor/*", "http://playcanvas.com/editor/*"],
+      "matches": [
+        "https://playcanvas.com/editor/*",
+        "http://playcanvas.com/editor/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://playcanvas.com/editor/*",
+        "http://playcanvas.com/editor/*"
+      ],
+      "js": ["editor-bridge.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
     }
   ]
 }
-
