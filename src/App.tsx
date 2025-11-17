@@ -62,7 +62,7 @@ export default function App() {
           </div>
         )}
         {error && (
-          <div className="absolute right-4 top-4 rounded-lg bg-rose-500/90 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+          <div className="z-50 absolute right-4 top-4 rounded-lg bg-rose-500/90 px-4 py-2 text-xs font-semibold text-white shadow-lg">
             {error}
           </div>
         )}
