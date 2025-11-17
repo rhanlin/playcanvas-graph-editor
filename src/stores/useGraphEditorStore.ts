@@ -1,20 +1,23 @@
-import { create } from 'zustand'
-import type { Edge, Node } from 'reactflow'
+import { create } from "zustand";
+import type { Edge, Node, OnNodesChange, OnEdgesChange } from "reactflow";
+import { applyNodeChanges, applyEdgeChanges } from "reactflow";
 
-import type { GraphDataPayload, GraphNodePayload } from '@/types/messaging'
+import type { GraphDataPayload, GraphNodePayload } from "@/types/messaging";
 
 interface GraphEditorState {
-  nodes: Node[]
-  edges: Edge[]
-  entityName: string | null
-  isLoading: boolean
-  error: string | null
-  setGraphData: (payload: GraphDataPayload) => void
-  setNodesDirect: (nodes: Node[]) => void
-  setEdgesDirect: (edges: Edge[]) => void
-  setLoading: (value: boolean) => void
-  setError: (message: string | null) => void
-  reset: () => void
+  nodes: Node[];
+  edges: Edge[];
+  entityName: string | null;
+  isLoading: boolean;
+  error: string | null;
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  setGraphData: (payload: GraphDataPayload) => void;
+  setNodes: (nodes: Node[]) => void;
+  setEdges: (edges: Edge[]) => void;
+  setLoading: (value: boolean) => void;
+  setError: (message: string | null) => void;
+  reset: () => void;
 }
 
 const mapNode = (node: GraphNodePayload): Node => {
@@ -27,23 +30,33 @@ const mapNode = (node: GraphNodePayload): Node => {
       scriptName: node.scriptName,
       scriptAttributes: node.scriptAttributes,
     },
-  }
-}
+  };
+};
 
-const mapEdge = (edge: GraphDataPayload['edges'][number]): Edge => ({
+const mapEdge = (edge: GraphDataPayload["edges"][number]): Edge => ({
   id: edge.id,
   source: edge.source,
   target: edge.target,
-  type: 'smoothstep',
+  type: "smoothstep",
   animated: true,
-})
+});
 
-export const useGraphEditorStore = create<GraphEditorState>((set) => ({
+export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   nodes: [],
   edges: [],
   entityName: null,
   isLoading: true,
   error: null,
+  onNodesChange: (changes) => {
+    set({
+      nodes: applyNodeChanges(changes, get().nodes),
+    });
+  },
+  onEdgesChange: (changes) => {
+    set({
+      edges: applyEdgeChanges(changes, get().edges),
+    });
+  },
   setGraphData: (payload) =>
     set({
       entityName: payload.entityName,
@@ -52,8 +65,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set) => ({
       isLoading: false,
       error: null,
     }),
-  setNodesDirect: (nodes) => set({ nodes }),
-  setEdgesDirect: (edges) => set({ edges }),
+  setNodes: (nodes) => set({ nodes }),
+  setEdges: (edges) => set({ edges }),
   setLoading: (value) =>
     set((state) => ({
       isLoading: value,
@@ -72,5 +85,4 @@ export const useGraphEditorStore = create<GraphEditorState>((set) => ({
       isLoading: true,
       error: null,
     }),
-}))
-
+}));

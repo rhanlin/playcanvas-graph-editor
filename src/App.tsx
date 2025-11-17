@@ -4,7 +4,7 @@ import { GraphEditorCanvas } from "@/components/graph-editor/GraphEditorCanvas";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import type { GraphResponse, RuntimeMessage } from "@/types/messaging";
 import { sendRuntimeMessage } from "@/utils/runtime";
-
+import { ReactFlowProvider } from "reactflow";
 export default function App() {
   const { entityName, isLoading, error, setGraphData, setLoading, setError } =
     useGraphEditorStore((state) => ({
@@ -28,7 +28,8 @@ export default function App() {
       })
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Unexpected error")
-      );
+      )
+      .finally(() => setLoading(false));
   }, [setGraphData, setLoading, setError]);
 
   useEffect(() => {
@@ -92,7 +93,9 @@ export default function App() {
           </div>
         )}
         <div className="flex-1 min-h-0">
-          <GraphEditorCanvas />
+          <ReactFlowProvider>
+            <GraphEditorCanvas />
+          </ReactFlowProvider>
         </div>
       </main>
     </div>
