@@ -1,0 +1,36 @@
+{
+  "name": "poc-graph-editor",
+  "version": "1.0.0",
+  "description": "Standalone PlayCanvas visual graph editor extension",
+  "main": "src/main.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "playcanvas",
+    "graph-editor",
+    "chrome-extension"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.18.3",
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "reactflow": "^11.11.4",
+    "zustand": "^4.5.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.7",
+    "autoprefixer": "^10.4.20",
+    "@types/chrome": "^0.0.266",
+    "@vitejs/plugin-react": "^4.3.4",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.3.3",
+    "vite": "^4.5.9"
+  }
+}

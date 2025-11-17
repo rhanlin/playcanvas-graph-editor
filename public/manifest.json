@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "PlayCanvas Graph Editor",
+  "description": "Visual graph editor overlay for PlayCanvas Editor",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "tabs"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open PlayCanvas Graph Editor"
+  },
+  "host_permissions": ["https://playcanvas.com/*", "http://playcanvas.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://playcanvas.com/editor/*", "http://playcanvas.com/editor/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+
