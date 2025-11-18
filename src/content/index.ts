@@ -24,6 +24,27 @@ function resolveRequest(requestId: string, payload: GraphResponse) {
   pendingRequests.delete(requestId);
 }
 
+// Helper function to safely send messages, ignoring errors when popup is not open
+function safeSendMessage(message: any) {
+  if (!chrome?.runtime?.sendMessage) {
+    return;
+  }
+
+  try {
+    chrome.runtime.sendMessage(message, () => {
+      // Check for errors silently - this is expected when popup is not open
+      const lastError = chrome.runtime?.lastError;
+      if (lastError) {
+        // Extension popup is not open, which is expected during initialization
+        // This is not an error condition, so we silently ignore it
+      }
+    });
+  } catch (error) {
+    // Silently ignore any errors during message sending
+    // This can happen if the extension context is invalidated
+  }
+}
+
 window.addEventListener("message", (event: MessageEvent) => {
   if (event.source !== window) {
     return;
@@ -44,7 +65,7 @@ window.addEventListener("message", (event: MessageEvent) => {
   }
 
   if (data?.type === "PC_GRAPH_SELECTION") {
-    chrome.runtime?.sendMessage?.({
+    safeSendMessage({
       type: "GRAPH_PUSH_DATA",
       payload: {
         success: data.success,
@@ -52,34 +73,67 @@ window.addEventListener("message", (event: MessageEvent) => {
         data: data.data,
       },
     });
+    return;
+  }
+
+  // Forward scene updates from editor bridge
+  if (data?.type === "PC_GRAPH_SCENE_UPDATE") {
+    safeSendMessage({
+      type: "GRAPH_PUSH_DATA",
+      payload: data,
+    });
+    return;
+  }
+
+  // Forward selection updates from editor bridge
+  if (data?.type === "PC_GRAPH_SELECTION_UPDATE") {
+    const selectionData = data as {
+      type: string;
+      payload?: { entityGuid: string | null; entityName?: string | null };
+    };
+    safeSendMessage({
+      type: "GRAPH_UPDATE_SELECTION",
+      payload: selectionData.payload || { entityGuid: null },
+    });
+    return;
   }
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "GRAPH_REQUEST_DATA") {
+  // Handle data requests (existing functionality)
+  if (message?.type === "GRAPH_REQUEST_DATA") {
+    const requestId = createRequestId();
+    const timeoutId = window.setTimeout(() => {
+      resolveRequest(requestId, {
+        success: false,
+        error: "Timed out waiting for PlayCanvas editor",
+      });
+    }, REQUEST_TIMEOUT_MS);
+
+    pendingRequests.set(requestId, {
+      timeoutId,
+      resolve: sendResponse,
+    });
+
+    window.postMessage(
+      {
+        type: "PC_GRAPH_FETCH",
+        requestId,
+      },
+      "*"
+    );
+
+    return true;
+  }
+
+  // Forward selection and attribute updates to editor bridge
+  if (
+    message?.type === "GRAPH_SET_SELECTION" ||
+    message?.type === "GRAPH_UPDATE_ATTRIBUTE"
+  ) {
+    window.postMessage(message, "*");
     return false;
   }
 
-  const requestId = createRequestId();
-  const timeoutId = window.setTimeout(() => {
-    resolveRequest(requestId, {
-      success: false,
-      error: "Timed out waiting for PlayCanvas editor",
-    });
-  }, REQUEST_TIMEOUT_MS);
-
-  pendingRequests.set(requestId, {
-    timeoutId,
-    resolve: sendResponse,
-  });
-
-  window.postMessage(
-    {
-      type: "PC_GRAPH_FETCH",
-      requestId,
-    },
-    "*"
-  );
-
-  return true;
+  return false;
 });

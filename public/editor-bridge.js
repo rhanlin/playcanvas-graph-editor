@@ -192,9 +192,43 @@
     );
   }
 
+  function broadcastSelectionUpdate() {
+    const editor = window.editor;
+    if (!editor) return;
+
+    const selection = editor.call("selector:items") || [];
+    const selectedGuid =
+      selection.length > 0 ? selection[0].get("resource_id") : null;
+    const selectedName = selection.length > 0 ? selection[0].get("name") : null;
+
+    window.postMessage(
+      {
+        type: "PC_GRAPH_SELECTION_UPDATE",
+        payload: {
+          entityGuid: selectedGuid,
+          entityName: selectedName,
+        },
+      },
+      "*"
+    );
+  }
+
   function handleGraphRequest(requestId) {
     const payload = createSceneGraphPayload();
     respond(requestId, payload);
+  }
+
+  function handleSetSelection(payload) {
+    const editor = window.editor;
+    if (!editor) return;
+
+    const { entityGuid } = payload;
+    const entity = editor.call("entities:get", entityGuid);
+    if (entity) {
+      editor.call("selector:set", "entity", [entity]);
+    } else {
+      editor.call("selector:clear");
+    }
   }
 
   function tryInitializeSelectorWatcher(retriesLeft = 20) {
@@ -217,6 +251,7 @@
       editor.on("selector:change", () => {
         try {
           broadcastSelection();
+          broadcastSelectionUpdate();
         } catch (error) {
           // eslint-disable-next-line no-console
           console.error("[GraphBridge] selector update failed", error);
@@ -225,6 +260,8 @@
 
       // And perform the initial broadcast to load the scene graph.
       broadcastSelection();
+      // Also broadcast initial selection state
+      broadcastSelectionUpdate();
     });
   }
 
@@ -269,6 +306,15 @@
     }
 
     const { type, requestId, payload } = event.data || {};
+
+    if (type === "GRAPH_SET_SELECTION") {
+      try {
+        handleSetSelection(payload);
+      } catch (e) {
+        console.error("[GraphBridge] Failed to handle set selection:", e);
+      }
+      return;
+    }
 
     if (type === "GRAPH_UPDATE_ATTRIBUTE") {
       try {

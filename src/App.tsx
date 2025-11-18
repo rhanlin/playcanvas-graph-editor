@@ -11,6 +11,7 @@ export default function App() {
     isLoading,
     error,
     setGraphData,
+    setSelectedEntity,
     setLoading,
     setError,
   } = useGraphEditorStore((state) => ({
@@ -18,6 +19,7 @@ export default function App() {
     isLoading: state.isLoading,
     error: state.error,
     setGraphData: state.setGraphData,
+    setSelectedEntity: state.setSelectedEntity,
     setLoading: state.setLoading,
     setError: state.setError,
   }));
@@ -50,6 +52,15 @@ export default function App() {
     // This handler now listens for messages from the content script,
     // which are forwarded from the editor bridge.
     const handler = (message: RuntimeMessage) => {
+      // Handle selection updates from the editor
+      if (message?.type === "GRAPH_UPDATE_SELECTION") {
+        setSelectedEntity(
+          message.payload.entityGuid,
+          message.payload.entityName
+        );
+        return;
+      }
+
       // We listen for GRAPH_PUSH_DATA which is now sent on selection changes
       // and initial load.
       if (message?.type !== "GRAPH_PUSH_DATA") {
@@ -69,7 +80,7 @@ export default function App() {
     return () => {
       chrome.runtime?.onMessage?.removeListener(handler);
     };
-  }, [setGraphData, setError]);
+  }, [setGraphData, setSelectedEntity, setError]);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">

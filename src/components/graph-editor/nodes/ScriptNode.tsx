@@ -1,13 +1,22 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 
-export const ScriptNode = memo(({ data }: NodeProps) => {
+export const ScriptNode = memo(({ data, selected }: NodeProps) => {
   const entityAttributes = Object.entries(data.attributes || {}).filter(
-    ([, attrData]) => attrData.type === "entity"
+    ([, attrData]) => {
+      const attr = attrData as { type?: string; value?: any };
+      return attr.type === "entity";
+    }
   );
 
   return (
-    <div className="rounded-md border border-sky-500/50 bg-slate-700/80 px-4 py-2 shadow-sm backdrop-blur-sm">
+    <div
+      className={`rounded-md border px-4 py-2 shadow-sm backdrop-blur-sm transition-all ${
+        selected
+          ? "border-yellow-400 bg-slate-700 ring-2 ring-yellow-400 ring-offset-1 ring-offset-slate-900 scale-105"
+          : "border-sky-500/50 bg-slate-700/80"
+      }`}
+    >
       <div className="font-semibold text-sky-300">{data.label}</div>
       <div className="mt-2 flex flex-col gap-2">
         {entityAttributes.length > 0 ? (

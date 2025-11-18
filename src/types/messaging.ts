@@ -26,6 +26,11 @@ export interface UpdateAttributePayload {
   targetEntityGuid: string | null; // null to clear the attribute
 }
 
+export interface UpdateSelectionPayload {
+  entityGuid: string | null;
+  entityName?: string | null;
+}
+
 export interface GraphResponse {
   success: boolean;
   error?: string;
@@ -37,4 +42,6 @@ export type RuntimeMessage =
   | { type: "GRAPH_RESPONSE_DATA"; payload: SceneGraphPayload }
   | { type: "GRAPH_ERROR"; error: string }
   | { type: "GRAPH_PUSH_DATA"; payload: GraphResponse }
-  | { type: "GRAPH_UPDATE_ATTRIBUTE"; payload: UpdateAttributePayload };
+  | { type: "GRAPH_UPDATE_ATTRIBUTE"; payload: UpdateAttributePayload }
+  | { type: "GRAPH_UPDATE_SELECTION"; payload: UpdateSelectionPayload }
+  | { type: "GRAPH_SET_SELECTION"; payload: UpdateSelectionPayload };
