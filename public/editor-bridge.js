@@ -250,7 +250,6 @@
       // Now that we are ready, set up the selector watcher for live updates.
       editor.on("selector:change", () => {
         try {
-          broadcastSelection();
           broadcastSelectionUpdate();
         } catch (error) {
           // eslint-disable-next-line no-console

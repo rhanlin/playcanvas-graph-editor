@@ -265,6 +265,9 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   },
   setGraphData: (payload) => {
     const { entities } = payload;
+    const existingNodesMap = new Map(
+      get().nodes.map((node) => [node.id, node])
+    );
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
 
@@ -273,15 +276,19 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     let row = 0;
 
     Object.values(entities).forEach((entity) => {
+      const existingEntityNode = existingNodesMap.get(entity.guid);
+      const defaultEntityPosition = {
+        x: col * (ENTITY_NODE_WIDTH + HORIZONTAL_SPACING),
+        y: row * (SCRIPT_VERTICAL_OFFSET * 4),
+      };
+
       newNodes.push({
         id: entity.guid,
         type: "entity",
-        position: {
-          x: col * (ENTITY_NODE_WIDTH + HORIZONTAL_SPACING),
-          y: row * (SCRIPT_VERTICAL_OFFSET * 4),
-        },
+        position: existingEntityNode?.position ?? defaultEntityPosition,
         data: { label: entity.name },
         style: { width: ENTITY_NODE_WIDTH },
+        selected: existingEntityNode?.selected ?? false,
       });
 
       col++;
@@ -299,16 +306,22 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
               attributes?: Record<string, { type: string; value: any }>;
             };
             const scriptNodeId = `${entity.guid}-${scriptName}`;
+            const existingScriptNode = existingNodesMap.get(scriptNodeId);
+            const defaultScriptPosition = {
+              x: 10,
+              y: SCRIPT_VERTICAL_OFFSET + scriptIndex * 80,
+            };
             newNodes.push({
               id: scriptNodeId,
               type: "script",
-              position: { x: 10, y: SCRIPT_VERTICAL_OFFSET + scriptIndex * 80 },
+              position: existingScriptNode?.position ?? defaultScriptPosition,
               parentNode: entity.guid,
               data: {
                 label: scriptName,
                 attributes: scriptData.attributes || {},
               },
               style: { width: SCRIPT_NODE_WIDTH },
+              selected: existingScriptNode?.selected ?? false,
             });
             scriptIndex++;
 
