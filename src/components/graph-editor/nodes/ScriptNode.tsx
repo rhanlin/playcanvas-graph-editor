@@ -1,48 +1,95 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 
-export const ScriptNode = memo(({ data, selected }: NodeProps) => {
-  const entityAttributes = Object.entries(data.attributes || {}).filter(
-    ([, attrData]) => {
-      const attr = attrData as { type?: string; value?: any };
-      return attr.type === "entity";
-    }
-  );
+import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 
-  return (
-    <div
-      className={`flex h-[84px] flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all ${
-        selected
-          ? "border-yellow-400 bg-slate-700 ring-2 ring-yellow-400 ring-offset-1 ring-offset-slate-900"
-          : "border-sky-500/40 bg-slate-800/80"
-      }`}
-    >
-      <div className="font-semibold text-sm text-sky-200">{data.label}</div>
-      <div className="mt-2 flex flex-col gap-2">
-        {entityAttributes.length > 0 ? (
-          entityAttributes.map(([key], index) => (
-            <div
-              key={key}
-              className="relative flex items-center justify-between"
-            >
-              <span className="text-sm text-slate-300">{key}</span>
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={key} // Crucial: id must match the attribute name for the edge to connect correctly
-                className="!h-2.5 !w-2.5 !bg-pink-400"
-                style={{ top: "50%", transform: "translateY(-50%)" }}
-              />
+type ScriptNodeData = {
+  label: string;
+  scriptName?: string;
+  entityGuid?: string;
+  attributes?: Record<
+    string,
+    {
+      type?: string;
+      value?: unknown;
+    }
+  >;
+};
+
+export const ScriptNode = memo(
+  ({ data, selected }: NodeProps<ScriptNodeData>) => {
+    const clearScriptAttribute = useGraphEditorStore(
+      (state) => state.clearScriptAttribute
+    );
+
+    const entityAttributes = Object.entries(data.attributes || {}).filter(
+      ([, attrData]) => {
+        const attr = attrData as { type?: string; value?: unknown };
+        return attr.type === "entity";
+      }
+    );
+
+    const scriptName = data.scriptName || data.label;
+    const entityGuid = data.entityGuid;
+
+    return (
+      <div
+        className={`flex h-[84px] flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all ${
+          selected
+            ? "border-yellow-400 bg-slate-700 ring-2 ring-yellow-400 ring-offset-1 ring-offset-slate-900"
+            : "border-sky-500/40 bg-slate-800/80"
+        }`}
+      >
+        <div className="font-semibold text-sm text-sky-200">{data.label}</div>
+        <div className="mt-2 flex flex-col gap-2">
+          {entityAttributes.length > 0 ? (
+            entityAttributes.map(([key, attrData]) => {
+              const attr = attrData as { type?: string; value?: unknown };
+              const isLinked = !!attr.value;
+              return (
+                <div
+                  key={key}
+                  className="relative flex items-center justify-between pr-6"
+                >
+                  <span className="text-sm text-slate-300">{key}</span>
+                  {isLinked ? (
+                    <button
+                      type="button"
+                      className="ml-2 inline-flex h-6 items-center justify-center rounded-md border border-white/10 px-2 text-xs font-semibold text-rose-200 hover:border-rose-300 hover:text-rose-100"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!entityGuid || !scriptName) {
+                          return;
+                        }
+                        clearScriptAttribute(entityGuid, scriptName, key);
+                      }}
+                    >
+                      ×
+                    </button>
+                  ) : (
+                    <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                      Unlinked
+                    </span>
+                  )}
+                  <Handle
+                    type="source"
+                    position={Position.Right}
+                    id={key}
+                    className="!absolute !right-0 !h-2.5 !w-2.5 !bg-pink-400"
+                    style={{ top: "50%", transform: "translateY(-50%)" }}
+                  />
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-xs italic text-slate-400">
+              No entity attributes
             </div>
-          ))
-        ) : (
-          <div className="text-xs italic text-slate-400">
-            No entity attributes
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
 ScriptNode.displayName = "ScriptNode";

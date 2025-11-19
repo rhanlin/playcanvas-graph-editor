@@ -14,6 +14,12 @@ import type { EntityPayload, SceneGraphPayload } from "@/types/messaging";
 import { buildGraphLayout, type PositionOverride } from "@/utils/graphLayout";
 import { sendRuntimeMessage } from "@/utils/runtime";
 
+interface ScriptEdgeData {
+  entityGuid: string;
+  scriptName: string;
+  attributeName: string;
+}
+
 interface GraphEditorState {
   nodes: Node[];
   edges: Edge[];
@@ -36,6 +42,12 @@ interface GraphEditorState {
     guid: string | null,
     name?: string | null,
     scriptNodeId?: string | null
+  ) => void;
+  clearScriptAttribute: (
+    entityGuid: string,
+    scriptName: string,
+    attributeName: string,
+    options?: { removeEdge?: boolean }
   ) => void;
   toggleEntityCollapse: (guid: string) => void;
   upsertEntity: (entity: EntityPayload) => void;
@@ -152,7 +164,10 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   error: null,
   onNodesChange: (changes) => {
     const state = get();
-    const updatedNodes = applyNodeChanges(changes, state.nodes);
+    const nonRemovalChanges = changes.filter(
+      (change) => change.type !== "remove"
+    );
+    const updatedNodes = applyNodeChanges(nonRemovalChanges, state.nodes);
 
     let newlySelectedScriptNodeId: string | null = null;
     let newlySelectedEntityGuid: string | null = null;
@@ -205,7 +220,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       currentScriptNodeId !== state.selectedScriptNodeId;
 
     const manualUpdates: Record<string, PositionOverride> = {};
-    changes.forEach((change) => {
+    nonRemovalChanges.forEach((change) => {
       if (change.type === "position" && !change.dragging) {
         const movedNode = updatedNodes.find((node) => node.id === change.id);
         if (movedNode) {
@@ -307,13 +322,47 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     }
   },
   onEdgesChange: (changes: EdgeChange[]) => {
+    const state = get();
+    const edgesBefore = state.edges;
+    const clearScriptAttribute = state.clearScriptAttribute;
+
+    const removedEdgeMetadata: ScriptEdgeData[] = changes
+      .filter((change) => change.type === "remove")
+      .map((change) => edgesBefore.find((edge) => edge.id === change.id))
+      .filter((edge): edge is Edge => !!edge)
+      .map((edge) => edge.data as ScriptEdgeData | undefined)
+      .filter(
+        (data): data is ScriptEdgeData =>
+          !!data &&
+          typeof data.entityGuid === "string" &&
+          typeof data.scriptName === "string" &&
+          typeof data.attributeName === "string"
+      );
+
     set({
-      edges: applyEdgeChanges(changes, get().edges),
+      edges: applyEdgeChanges(changes, edgesBefore),
+    });
+
+    removedEdgeMetadata.forEach((meta) => {
+      clearScriptAttribute(
+        meta.entityGuid,
+        meta.scriptName,
+        meta.attributeName,
+        {
+          removeEdge: false,
+        }
+      );
     });
   },
   onConnect: (connection: Connection) => {
     const { source, sourceHandle, target } = connection;
     if (!source || !sourceHandle || !target) return;
+
+    const attributeName =
+      typeof sourceHandle === "string" ? sourceHandle : String(sourceHandle);
+    if (!attributeName) {
+      return;
+    }
 
     const scriptNode = get().nodes.find(
       (node) => node.id === source && node.type === "script"
@@ -335,7 +384,16 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
 
     set((state) => ({
       edges: addEdge(
-        { ...connection, type: "smoothstep", animated: true },
+        {
+          ...connection,
+          type: "smoothstep",
+          animated: true,
+          data: {
+            entityGuid,
+            scriptName,
+            attributeName,
+          },
+        },
         state.edges
       ),
     }));
@@ -345,7 +403,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       payload: {
         entityGuid,
         scriptName,
-        attributeName: sourceHandle,
+        attributeName,
         targetEntityGuid: target,
       },
     }).catch((err) => {
@@ -409,6 +467,43 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         // This can happen during initialization
       });
     }
+  },
+  clearScriptAttribute: (
+    entityGuid,
+    scriptName,
+    attributeName,
+    options = { removeEdge: true }
+  ) => {
+    if (!entityGuid || !scriptName || !attributeName) {
+      return;
+    }
+
+    const { removeEdge = true } = options;
+    const scriptNodeId = `${entityGuid}-${scriptName}`;
+
+    if (removeEdge) {
+      set((state) => ({
+        edges: state.edges.filter(
+          (edge) =>
+            !(
+              edge.source === scriptNodeId &&
+              edge.sourceHandle === attributeName
+            )
+        ),
+      }));
+    }
+
+    sendRuntimeMessage({
+      type: "GRAPH_UPDATE_ATTRIBUTE",
+      payload: {
+        entityGuid,
+        scriptName,
+        attributeName,
+        targetEntityGuid: null,
+      },
+    }).catch(() => {
+      // silently ignore connection errors
+    });
   },
   toggleEntityCollapse: (guid) => {
     set((state) => {

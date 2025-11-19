@@ -233,6 +233,7 @@ export function buildGraphLayout({
         data: {
           label: scriptName,
           scriptName,
+          entityGuid: guid,
           attributes: scriptData.attributes || {},
         },
       });
@@ -254,6 +255,11 @@ export function buildGraphLayout({
                 type: "smoothstep",
                 animated: true,
                 style: { stroke: "#ec4899", strokeWidth: 2 },
+                data: {
+                  entityGuid: guid,
+                  scriptName,
+                  attributeName,
+                },
               });
             }
           }

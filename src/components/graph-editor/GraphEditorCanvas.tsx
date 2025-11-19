@@ -1,5 +1,11 @@
-import React, { useCallback } from "react";
-import { ReactFlow, Background, Controls, MiniMap } from "reactflow";
+import React, { useCallback, useEffect } from "react";
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  useReactFlow,
+} from "reactflow";
 import "reactflow/dist/style.css";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
@@ -19,7 +25,9 @@ export function GraphEditorCanvas() {
     onEdgesChange,
     onConnect,
     setSelectedEntity,
+    clearScriptAttribute,
   } = useGraphEditorStore();
+  const reactFlowInstance = useReactFlow();
 
   const onNodeClick = useCallback(
     (_event, node) => {
@@ -41,6 +49,46 @@ export function GraphEditorCanvas() {
     },
     [setSelectedEntity, nodes]
   );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") {
+        return;
+      }
+
+      const currentEdges = reactFlowInstance.getEdges();
+      const selectedEdges = currentEdges.filter((edge) => edge.selected);
+      if (!selectedEdges.length) {
+        return;
+      }
+
+      event.preventDefault();
+
+      selectedEdges.forEach((edge) => {
+        const data = edge.data as
+          | {
+              entityGuid?: string;
+              scriptName?: string;
+              attributeName?: string;
+            }
+          | undefined;
+        if (
+          data?.entityGuid &&
+          data?.scriptName &&
+          data?.attributeName
+        ) {
+          clearScriptAttribute(
+            data.entityGuid,
+            data.scriptName,
+            data.attributeName
+          );
+        }
+      });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [reactFlowInstance, clearScriptAttribute]);
 
   return (
     <ReactFlow
