@@ -159,18 +159,30 @@ export function buildGraphLayout({
 
   const scriptEdgesMap: Edge[] = [];
 
+  interface SubtreeResult {
+    width: number;
+    height: number;
+    position: XYPosition;
+  }
+
   const buildSubtree = (
     guid: string,
     parentId: string | null,
     defaultPosition: XYPosition
-  ) => {
+  ): SubtreeResult => {
     const entity = entities[guid];
     if (!entity) {
-      return;
+      return {
+        width: ENTITY_MIN_WIDTH,
+        height: ENTITY_HEADER_HEIGHT + ENTITY_PADDING * 2,
+        position: defaultPosition,
+      };
     }
     const layout = layoutInfoCache.get(guid)!;
     const collapsed = !!collapsedState[guid];
     const position = getStoredPosition(guid, parentId, defaultPosition);
+
+    const nodesStartIndex = nodes.length;
 
     const entityNode: Node = {
       id: guid,
@@ -183,7 +195,6 @@ export function buildGraphLayout({
       position,
       parentNode: parentId ?? undefined,
       draggable: true,
-      extent: parentId ? "parent" : undefined,
       style: {
         width: layout.width,
         height: layout.height,
@@ -193,10 +204,30 @@ export function buildGraphLayout({
     nodes.push(entityNode);
 
     if (collapsed) {
-      return;
+      return {
+        width: layout.width,
+        height: layout.height,
+        position,
+      };
     }
 
     let contentY = ENTITY_HEADER_HEIGHT + SECTION_GAP;
+    const bounds = {
+      minX: Number.POSITIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY,
+    };
+
+    const registerBounds = (
+      nodePosition: XYPosition,
+      size: { width: number; height: number }
+    ) => {
+      bounds.minX = Math.min(bounds.minX, nodePosition.x);
+      bounds.minY = Math.min(bounds.minY, nodePosition.y);
+      bounds.maxX = Math.max(bounds.maxX, nodePosition.x + size.width);
+      bounds.maxY = Math.max(bounds.maxY, nodePosition.y + size.height);
+    };
 
     const scriptComponent = entity.components?.script;
     const scriptEntries = scriptComponent?.scripts
@@ -224,7 +255,6 @@ export function buildGraphLayout({
         type: "script",
         parentNode: guid,
         draggable: true,
-        extent: "parent",
         position: scriptPosition,
         style: {
           width: SCRIPT_NODE_WIDTH,
@@ -236,6 +266,11 @@ export function buildGraphLayout({
           entityGuid: guid,
           attributes: scriptData.attributes || {},
         },
+      });
+
+      registerBounds(scriptPosition, {
+        width: SCRIPT_NODE_WIDTH,
+        height: SCRIPT_NODE_HEIGHT,
       });
 
       if (scriptData.attributes) {
@@ -276,26 +311,82 @@ export function buildGraphLayout({
       contentY += SECTION_GAP;
     }
 
-    if (guid === rootGuid) {
-      return;
+    if (guid !== rootGuid) {
+      layout.childOrder.forEach((childGuid, index) => {
+        const childDefaultPos: XYPosition = {
+          x: ENTITY_PADDING,
+          y: contentY,
+        };
+        const childResult = buildSubtree(childGuid, guid, childDefaultPos);
+        registerBounds(childResult.position, {
+          width: childResult.width,
+          height: childResult.height,
+        });
+        contentY += childResult.height;
+        if (index < layout.childOrder.length - 1) {
+          contentY += CHILD_VERTICAL_GAP;
+        }
+      });
     }
 
-    layout.childOrder.forEach((childGuid, index) => {
-      const childSize = layout.childSizes[childGuid];
-      const childDefaultPos: XYPosition = {
-        x: ENTITY_PADDING,
-        y: contentY,
+    const hasContent =
+      Number.isFinite(bounds.minX) &&
+      Number.isFinite(bounds.minY) &&
+      Number.isFinite(bounds.maxX) &&
+      Number.isFinite(bounds.maxY);
+
+    const shiftX =
+      hasContent && bounds.minX < ENTITY_PADDING
+        ? ENTITY_PADDING - bounds.minX
+        : 0;
+    const shiftY =
+      hasContent && bounds.minY < ENTITY_PADDING
+        ? ENTITY_PADDING - bounds.minY
+        : 0;
+
+    if (shiftX || shiftY) {
+      entityNode.position = {
+        x: entityNode.position.x - shiftX,
+        y: entityNode.position.y - shiftY,
       };
-      buildSubtree(childGuid, guid, childDefaultPos);
-      contentY += childSize.height;
-      if (index < layout.childOrder.length - 1) {
-        contentY += CHILD_VERTICAL_GAP;
+
+      for (let i = nodesStartIndex; i < nodes.length; i += 1) {
+        const node = nodes[i];
+        if (node.parentNode === guid) {
+          node.position = {
+            x: node.position.x + shiftX,
+            y: node.position.y + shiftY,
+          };
+        }
       }
-    });
+
+      bounds.minX += shiftX;
+      bounds.maxX += shiftX;
+      bounds.minY += shiftY;
+      bounds.maxY += shiftY;
+    }
+
+    const requiredWidth = hasContent
+      ? Math.max(layout.width, bounds.maxX + ENTITY_PADDING)
+      : layout.width;
+    const requiredHeight = hasContent
+      ? Math.max(layout.height, bounds.maxY + ENTITY_PADDING)
+      : layout.height;
+
+    entityNode.style = {
+      ...entityNode.style,
+      width: requiredWidth,
+      height: requiredHeight,
+    };
+
+    return {
+      width: requiredWidth,
+      height: requiredHeight,
+      position,
+    };
   };
 
   topLevelEntities.forEach((entity, index) => {
-    const layout = layoutInfoCache.get(entity.guid)!;
     if (currentCol >= columnCount) {
       currentCol = 0;
       currentRowY = nextRowY;
@@ -306,10 +397,10 @@ export function buildGraphLayout({
     };
     const position = getStoredPosition(entity.guid, null, defaultTopPosition);
 
-    buildSubtree(entity.guid, null, position);
+    const result = buildSubtree(entity.guid, null, position);
 
     currentCol += 1;
-    nextRowY = Math.max(nextRowY, currentRowY + layout.height + ROOT_ROW_GAP);
+    nextRowY = Math.max(nextRowY, currentRowY + result.height + ROOT_ROW_GAP);
   });
 
   edges.push(...scriptEdgesMap);
