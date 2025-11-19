@@ -202,14 +202,19 @@
     // to kick off the traversal on the other side.
     const rootGuid = rootEntity.get("resource_id");
 
+    const config = window.config || {};
+    const projectId = config.project?.id ?? null;
+    const sceneId = config.scene?.id ?? null;
+
     return {
       success: true,
       data: {
         rootGuid,
         entities: Object.fromEntries(entitiesMap),
-        // We still send the selected entity's name for the header display
         selectedEntityName:
           editor.call("selector:items")?.[0]?.get("name") || null,
+        projectId,
+        sceneId,
       },
     };
   }

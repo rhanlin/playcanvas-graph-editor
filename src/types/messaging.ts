@@ -17,6 +17,8 @@ export interface SceneGraphPayload {
   rootGuid: string;
   entities: Record<string, EntityPayload>;
   selectedEntityName: string | null;
+  projectId: number | string | null;
+  sceneId: number | string | null;
 }
 
 export interface UpdateAttributePayload {

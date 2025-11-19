@@ -11,12 +11,18 @@ import type {
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "reactflow";
 
 import type { EntityPayload, SceneGraphPayload } from "@/types/messaging";
+import { buildGraphLayout, type PositionOverride } from "@/utils/graphLayout";
 import { sendRuntimeMessage } from "@/utils/runtime";
 
 interface GraphEditorState {
   nodes: Node[];
   edges: Edge[];
   entities: Record<string, EntityPayload>;
+  rootGuid: string | null;
+  projectId: number | string | null;
+  sceneId: number | string | null;
+  manualPositions: Record<string, PositionOverride>;
+  collapsedState: Record<string, boolean>;
   selectedEntityGuid: string | null;
   selectedScriptNodeId: string | null;
   selectedEntityName: string | null;
@@ -31,6 +37,7 @@ interface GraphEditorState {
     name?: string | null,
     scriptNodeId?: string | null
   ) => void;
+  toggleEntityCollapse: (guid: string) => void;
   upsertEntity: (entity: EntityPayload) => void;
   removeEntity: (guid: string) => void;
   setNodes: (nodes: Node[]) => void;
@@ -44,93 +51,100 @@ const ENTITY_NODE_WIDTH = 250;
 const SCRIPT_NODE_WIDTH = 200;
 const HORIZONTAL_SPACING = 100;
 const SCRIPT_VERTICAL_OFFSET = 60;
+const LAYOUT_STORAGE_PREFIX = "pc-ge-layout";
 
-type NodeMap = Map<string, Node>;
-
-function computeNextEntityPosition(nodes: Node[]): { x: number; y: number } {
-  const entityNodes = nodes.filter((node) => node.type === "entity");
-  if (entityNodes.length === 0) {
-    return { x: 0, y: 0 };
-  }
-
-  const maxRight = Math.max(
-    ...entityNodes.map((node) => (node.position?.x ?? 0) + ENTITY_NODE_WIDTH)
-  );
-  const topMost = Math.min(...entityNodes.map((node) => node.position?.y ?? 0));
-
-  return {
-    x: maxRight + HORIZONTAL_SPACING,
-    y: topMost,
-  };
+interface LayoutStorage {
+  manualPositions: Record<string, PositionOverride>;
+  collapsedState: Record<string, boolean>;
 }
 
-function buildScriptNodesAndEdges(
-  entity: EntityPayload,
-  existingNodesMap?: NodeMap
-) {
-  const scriptNodes: Node[] = [];
-  const scriptEdges: Edge[] = [];
-  const scriptComponent = entity.components?.script;
+const getLayoutStorageKey = (
+  projectId: number | string | null,
+  sceneId: number | string | null
+) => {
+  const projectPart = projectId ?? "unknownProject";
+  const scenePart = sceneId ?? "unknownScene";
+  return `${LAYOUT_STORAGE_PREFIX}-${projectPart}-${scenePart}`;
+};
 
-  if (!scriptComponent?.scripts) {
-    return { scriptNodes, scriptEdges };
+const loadLayoutState = (
+  projectId: number | string | null,
+  sceneId: number | string | null
+): LayoutStorage => {
+  if (typeof window === "undefined" || projectId == null || sceneId == null) {
+    return { manualPositions: {}, collapsedState: {} };
   }
-
-  let scriptIndex = 0;
-  Object.entries(scriptComponent.scripts).forEach(
-    ([scriptName, scriptDataRaw]) => {
-      const scriptData = scriptDataRaw as {
-        attributes?: Record<string, { type: string; value: any }>;
-      };
-      const scriptNodeId = `${entity.guid}-${scriptName}`;
-      const existingScriptNode = existingNodesMap?.get(scriptNodeId);
-      const defaultPosition = existingScriptNode?.position ?? {
-        x: 10,
-        y: SCRIPT_VERTICAL_OFFSET + scriptIndex * 80,
-      };
-
-      scriptNodes.push({
-        id: scriptNodeId,
-        type: "script",
-        position: defaultPosition,
-        parentNode: entity.guid,
-        data: {
-          label: scriptName,
-          attributes: scriptData.attributes || {},
-        },
-        style: { width: SCRIPT_NODE_WIDTH },
-        selected: existingScriptNode?.selected ?? false,
-      });
-
-      if (scriptData.attributes) {
-        Object.entries(scriptData.attributes).forEach(
-          ([attrName, attrDataRaw]) => {
-            const attrData = attrDataRaw as { type: string; value: any };
-            if (attrData.type === "entity" && attrData.value) {
-              scriptEdges.push({
-                id: `${scriptNodeId}-${attrName}-${attrData.value}`,
-                source: scriptNodeId,
-                sourceHandle: attrName,
-                target: attrData.value,
-                type: "smoothstep",
-                animated: true,
-              });
-            }
-          }
-        );
-      }
-
-      scriptIndex++;
+  try {
+    const raw = window.localStorage.getItem(
+      getLayoutStorageKey(projectId, sceneId)
+    );
+    if (!raw) {
+      return { manualPositions: {}, collapsedState: {} };
     }
-  );
+    const parsed = JSON.parse(raw);
+    return {
+      manualPositions: parsed.manualPositions || {},
+      collapsedState: parsed.collapsedState || {},
+    };
+  } catch {
+    return { manualPositions: {}, collapsedState: {} };
+  }
+};
 
-  return { scriptNodes, scriptEdges };
-}
+const buildLayoutFromState = (
+  rootGuid: string | null,
+  entities: Record<string, EntityPayload>,
+  selectedEntityName: string | null,
+  manualPositions: Record<string, PositionOverride>,
+  collapsedState: Record<string, boolean>,
+  projectId: number | string | null,
+  sceneId: number | string | null
+) => {
+  if (!rootGuid) {
+    return { nodes: [], edges: [] };
+  }
+
+  return buildGraphLayout({
+    payload: {
+      rootGuid,
+      entities,
+      selectedEntityName,
+      projectId,
+      sceneId,
+    },
+    manualPositions,
+    collapsedState,
+  });
+};
+
+const persistLayoutState = (
+  projectId: number | string | null,
+  sceneId: number | string | null,
+  manualPositions: Record<string, PositionOverride>,
+  collapsedState: Record<string, boolean>
+) => {
+  if (typeof window === "undefined" || projectId == null || sceneId == null) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      getLayoutStorageKey(projectId, sceneId),
+      JSON.stringify({ manualPositions, collapsedState })
+    );
+  } catch {
+    // ignore write errors
+  }
+};
 
 export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   nodes: [],
   edges: [],
   entities: {},
+  rootGuid: null,
+  projectId: null,
+  sceneId: null,
+  manualPositions: {},
+  collapsedState: {},
   selectedEntityGuid: null,
   selectedScriptNodeId: null,
   selectedEntityName: null,
@@ -140,13 +154,10 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     const state = get();
     const updatedNodes = applyNodeChanges(changes, state.nodes);
 
-    // Detect what was selected/deselected by checking the changes
-    // React Flow may send multiple changes: first deselect all, then select new
     let newlySelectedScriptNodeId: string | null = null;
     let newlySelectedEntityGuid: string | null = null;
     let shouldClearSelection = false;
 
-    // First pass: find what was selected
     for (const change of changes) {
       if (change.type === "select" && change.selected === true) {
         const node = updatedNodes.find((n) => n.id === change.id);
@@ -158,7 +169,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
           newlySelectedScriptNodeId = null;
         }
       } else if (change.type === "select" && change.selected === false) {
-        // Check if the currently selected node was deselected
         const node = updatedNodes.find((n) => n.id === change.id);
         if (
           (node?.type === "script" && state.selectedScriptNodeId === node.id) ||
@@ -169,7 +179,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       }
     }
 
-    // Determine current selection state
     let currentScriptNodeId: string | null;
     let currentEntityGuid: string | null;
 
@@ -178,25 +187,20 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       newlySelectedScriptNodeId === null &&
       newlySelectedEntityGuid === null
     ) {
-      // Everything was deselected and nothing new was selected
       currentScriptNodeId = null;
       currentEntityGuid = null;
     } else if (
       newlySelectedScriptNodeId !== null ||
       newlySelectedEntityGuid !== null
     ) {
-      // New selection detected
       currentScriptNodeId = newlySelectedScriptNodeId;
       currentEntityGuid = newlySelectedEntityGuid;
     } else {
-      // No change detected, keep existing state
       currentScriptNodeId = state.selectedScriptNodeId;
       currentEntityGuid = state.selectedEntityGuid;
     }
 
-    // Apply our custom selection logic to all nodes
     const finalNodes = updatedNodes.map((node) => {
-      // If we have a selected script node, maintain selection for both script and its parent entity
       if (
         currentScriptNodeId &&
         node.type === "script" &&
@@ -205,7 +209,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         return { ...node, selected: true };
       }
       if (currentScriptNodeId && node.type === "entity") {
-        // Find the script node to get its parent
         const scriptNode = updatedNodes.find(
           (n) => n.id === currentScriptNodeId
         );
@@ -213,7 +216,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
           return { ...node, selected: true };
         }
       }
-      // If we have a selected entity (but no script), only highlight that entity
       if (
         !currentScriptNodeId &&
         currentEntityGuid &&
@@ -222,41 +224,69 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       ) {
         return { ...node, selected: true };
       }
-      // Clear selection for nodes that shouldn't be selected
       if (
         (!currentScriptNodeId || node.id !== currentScriptNodeId) &&
         (!currentEntityGuid || node.id !== currentEntityGuid)
       ) {
         return { ...node, selected: false };
       }
-      // Otherwise, preserve React Flow's selection state
       return node;
     });
 
-    // Always update state to ensure consistency
     const entityNode = updatedNodes.find(
       (n) => n.id === currentEntityGuid && n.type === "entity"
     );
 
-    // Notify Editor if selection changed
     const selectionChanged =
       currentEntityGuid !== state.selectedEntityGuid ||
       currentScriptNodeId !== state.selectedScriptNodeId;
+
+    const manualUpdates: Record<string, PositionOverride> = {};
+    changes.forEach((change) => {
+      if (change.type === "position" && !change.dragging) {
+        const movedNode = updatedNodes.find((node) => node.id === change.id);
+        if (movedNode) {
+          manualUpdates[change.id] = {
+            x: movedNode.position.x,
+            y: movedNode.position.y,
+            parentId: movedNode.parentNode ?? null,
+          };
+        }
+      }
+    });
+
+    const manualPositions =
+      Object.keys(manualUpdates).length > 0
+        ? { ...state.manualPositions, ...manualUpdates }
+        : state.manualPositions;
 
     set({
       nodes: finalNodes,
       selectedScriptNodeId: currentScriptNodeId,
       selectedEntityGuid: currentEntityGuid,
       selectedEntityName: entityNode?.data?.label ?? null,
+      manualPositions,
     });
 
-    // Notify the editor if selection changed (always select entity, even if script was clicked)
+    if (
+      Object.keys(manualUpdates).length &&
+      state.projectId != null &&
+      state.sceneId != null
+    ) {
+      persistLayoutState(
+        state.projectId,
+        state.sceneId,
+        manualPositions,
+        state.collapsedState
+      );
+    }
+
     if (selectionChanged && currentEntityGuid) {
       sendRuntimeMessage({
         type: "GRAPH_SET_SELECTION",
         payload: { entityGuid: currentEntityGuid },
-      }).catch((err) => {
-        // Silently ignore errors when content script is not ready
+      }).catch(() => {
+        // ignore errors when content script isn't ready
       });
     }
   },
@@ -349,40 +379,53 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       });
     }
   },
-  upsertEntity: (entity) => {
+  toggleEntityCollapse: (guid) => {
     set((state) => {
-      const existingNodesMap: NodeMap = new Map(
-        state.nodes.map((node) => [node.id, node])
-      );
-      const existingEntityNode = existingNodesMap.get(entity.guid);
-      const nodesWithoutEntity = state.nodes.filter(
-        (node) => node.id !== entity.guid && node.parentNode !== entity.guid
-      );
-      const edgesWithoutEntityScripts = state.edges.filter(
-        (edge) => !edge.source.startsWith(`${entity.guid}-`)
-      );
-
-      const entityPosition =
-        existingEntityNode?.position ?? computeNextEntityPosition(state.nodes);
-
-      const entityNode: Node = {
-        id: entity.guid,
-        type: "entity",
-        position: entityPosition,
-        data: { label: entity.name },
-        style: { width: ENTITY_NODE_WIDTH },
-        selected: existingEntityNode?.selected ?? false,
+      const collapsedState = {
+        ...state.collapsedState,
+        [guid]: !state.collapsedState[guid],
       };
 
-      const { scriptNodes, scriptEdges } = buildScriptNodesAndEdges(
-        entity,
-        existingNodesMap
+      const { nodes, edges } = buildLayoutFromState(
+        state.rootGuid,
+        state.entities,
+        state.selectedEntityName,
+        state.manualPositions,
+        collapsedState,
+        state.projectId,
+        state.sceneId
+      );
+
+      if (state.projectId != null && state.sceneId != null) {
+        persistLayoutState(
+          state.projectId,
+          state.sceneId,
+          state.manualPositions,
+          collapsedState
+        );
+      }
+
+      return { collapsedState, nodes, edges };
+    });
+  },
+  upsertEntity: (entity) => {
+    set((state) => {
+      const entities = { ...state.entities, [entity.guid]: entity };
+
+      const { nodes, edges } = buildLayoutFromState(
+        state.rootGuid,
+        entities,
+        state.selectedEntityName,
+        state.manualPositions,
+        state.collapsedState,
+        state.projectId,
+        state.sceneId
       );
 
       return {
-        entities: { ...state.entities, [entity.guid]: entity },
-        nodes: [...nodesWithoutEntity, entityNode, ...scriptNodes],
-        edges: [...edgesWithoutEntityScripts, ...scriptEdges],
+        entities,
+        nodes,
+        edges,
         isLoading: false,
         error: null,
       };
@@ -394,26 +437,74 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     }
 
     set((state) => {
-      const scriptPrefix = `${guid}-`;
-      const nextEntities = { ...state.entities };
-      delete nextEntities[guid];
+      const collectDescendants = (id: string, acc: Set<string>) => {
+        if (acc.has(id)) return;
+        acc.add(id);
+        const entity = state.entities[id];
+        if (!entity) return;
+        entity.children.forEach((childId) => collectDescendants(childId, acc));
+      };
 
-      const nodes = state.nodes.filter(
-        (node) => node.id !== guid && node.parentNode !== guid
-      );
-      const edges = state.edges.filter(
-        (edge) => !edge.source.startsWith(scriptPrefix) && edge.target !== guid
-      );
+      const toRemove = new Set<string>();
+      collectDescendants(guid, toRemove);
 
-      const selectionRemoved = state.selectedEntityGuid === guid;
+      const entities = { ...state.entities };
+      toRemove.forEach((id) => {
+        delete entities[id];
+      });
+
+      const manualPositions = { ...state.manualPositions };
+      Object.keys(manualPositions).forEach((key) => {
+        if (toRemove.has(key)) {
+          delete manualPositions[key];
+          return;
+        }
+        for (const id of toRemove) {
+          if (key.startsWith(`${id}-`)) {
+            delete manualPositions[key];
+            break;
+          }
+        }
+      });
+
+      const collapsedState = { ...state.collapsedState };
+      toRemove.forEach((id) => {
+        delete collapsedState[id];
+      });
+
+      const selectionRemoved = toRemove.has(state.selectedEntityGuid || "");
       const scriptSelectionRemoved =
         state.selectedScriptNodeId &&
-        state.selectedScriptNodeId.startsWith(scriptPrefix);
+        (toRemove.has(state.selectedScriptNodeId) ||
+          Array.from(toRemove).some((id) =>
+            state.selectedScriptNodeId!.startsWith(`${id}-`)
+          ));
+
+      const { nodes, edges } = buildLayoutFromState(
+        state.rootGuid,
+        entities,
+        selectionRemoved ? null : state.selectedEntityName,
+        manualPositions,
+        collapsedState,
+        state.projectId,
+        state.sceneId
+      );
+
+      if (state.projectId != null && state.sceneId != null) {
+        persistLayoutState(
+          state.projectId,
+          state.sceneId,
+          manualPositions,
+          collapsedState
+        );
+      }
 
       return {
-        entities: nextEntities,
+        entities,
         nodes,
         edges,
+        manualPositions,
+        collapsedState,
         selectedEntityGuid: selectionRemoved ? null : state.selectedEntityGuid,
         selectedScriptNodeId: scriptSelectionRemoved
           ? null
@@ -423,96 +514,39 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     });
   },
   setGraphData: (payload) => {
-    const { entities } = payload;
-    const existingNodesMap = new Map(
-      get().nodes.map((node) => [node.id, node])
-    );
-    const newNodes: Node[] = [];
-    const newEdges: Edge[] = [];
+    set((state) => {
+      const incomingProjectId = payload.projectId ?? null;
+      const incomingSceneId = payload.sceneId ?? null;
+      const storageChanged =
+        incomingProjectId !== state.projectId ||
+        incomingSceneId !== state.sceneId;
 
-    const columns = Math.ceil(Math.sqrt(Object.keys(entities).length) || 1);
-    let col = 0;
-    let row = 0;
+      const layoutState = storageChanged
+        ? loadLayoutState(incomingProjectId, incomingSceneId)
+        : {
+            manualPositions: state.manualPositions,
+            collapsedState: state.collapsedState,
+          };
 
-    Object.values(entities).forEach((entity) => {
-      const existingEntityNode = existingNodesMap.get(entity.guid);
-      const defaultEntityPosition = {
-        x: col * (ENTITY_NODE_WIDTH + HORIZONTAL_SPACING),
-        y: row * (SCRIPT_VERTICAL_OFFSET * 4),
-      };
-
-      newNodes.push({
-        id: entity.guid,
-        type: "entity",
-        position: existingEntityNode?.position ?? defaultEntityPosition,
-        data: { label: entity.name },
-        style: { width: ENTITY_NODE_WIDTH },
-        selected: existingEntityNode?.selected ?? false,
+      const { nodes, edges } = buildGraphLayout({
+        payload,
+        manualPositions: layoutState.manualPositions,
+        collapsedState: layoutState.collapsedState,
       });
 
-      col++;
-      if (col >= columns) {
-        col = 0;
-        row++;
-      }
-
-      const scriptComponent = entity.components?.script;
-      if (scriptComponent?.scripts) {
-        let scriptIndex = 0;
-        Object.entries(scriptComponent.scripts).forEach(
-          ([scriptName, scriptDataRaw]) => {
-            const scriptData = scriptDataRaw as {
-              attributes?: Record<string, { type: string; value: any }>;
-            };
-            const scriptNodeId = `${entity.guid}-${scriptName}`;
-            const existingScriptNode = existingNodesMap.get(scriptNodeId);
-            const defaultScriptPosition = {
-              x: 10,
-              y: SCRIPT_VERTICAL_OFFSET + scriptIndex * 80,
-            };
-            newNodes.push({
-              id: scriptNodeId,
-              type: "script",
-              position: existingScriptNode?.position ?? defaultScriptPosition,
-              parentNode: entity.guid,
-              data: {
-                label: scriptName,
-                attributes: scriptData.attributes || {},
-              },
-              style: { width: SCRIPT_NODE_WIDTH },
-              selected: existingScriptNode?.selected ?? false,
-            });
-            scriptIndex++;
-
-            if (scriptData.attributes) {
-              Object.entries(scriptData.attributes).forEach(
-                ([attrName, attrDataRaw]) => {
-                  const attrData = attrDataRaw as { type: string; value: any };
-                  if (attrData.type === "entity" && attrData.value) {
-                    newEdges.push({
-                      id: `${scriptNodeId}-${attrName}-${attrData.value}`,
-                      source: scriptNodeId,
-                      sourceHandle: attrName,
-                      target: attrData.value,
-                      type: "smoothstep",
-                      animated: true,
-                    });
-                  }
-                }
-              );
-            }
-          }
-        );
-      }
-    });
-
-    set({
-      selectedEntityName: payload.selectedEntityName,
-      entities: payload.entities,
-      nodes: newNodes,
-      edges: newEdges,
-      isLoading: false,
-      error: null,
+      return {
+        selectedEntityName: payload.selectedEntityName,
+        entities: payload.entities,
+        nodes,
+        edges,
+        isLoading: false,
+        error: null,
+        rootGuid: payload.rootGuid,
+        projectId: incomingProjectId,
+        sceneId: incomingSceneId,
+        manualPositions: layoutState.manualPositions,
+        collapsedState: layoutState.collapsedState,
+      };
     });
   },
   setNodes: (nodes) => set({ nodes }),
@@ -532,6 +566,11 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       nodes: [],
       edges: [],
       entities: {},
+      rootGuid: null,
+      projectId: null,
+      sceneId: null,
+      manualPositions: {},
+      collapsedState: {},
       selectedEntityGuid: null,
       selectedScriptNodeId: null,
       selectedEntityName: null,

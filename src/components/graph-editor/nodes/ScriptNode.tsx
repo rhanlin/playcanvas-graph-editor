@@ -11,13 +11,13 @@ export const ScriptNode = memo(({ data, selected }: NodeProps) => {
 
   return (
     <div
-      className={`rounded-md border px-4 py-2 shadow-sm backdrop-blur-sm transition-all ${
+      className={`flex h-[84px] flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all ${
         selected
-          ? "border-yellow-400 bg-slate-700 ring-2 ring-yellow-400 ring-offset-1 ring-offset-slate-900 scale-105"
-          : "border-sky-500/50 bg-slate-700/80"
+          ? "border-yellow-400 bg-slate-700 ring-2 ring-yellow-400 ring-offset-1 ring-offset-slate-900"
+          : "border-sky-500/40 bg-slate-800/80"
       }`}
     >
-      <div className="font-semibold text-sky-300">{data.label}</div>
+      <div className="font-semibold text-sm text-sky-200">{data.label}</div>
       <div className="mt-2 flex flex-col gap-2">
         {entityAttributes.length > 0 ? (
           entityAttributes.map(([key], index) => (
@@ -30,7 +30,7 @@ export const ScriptNode = memo(({ data, selected }: NodeProps) => {
                 type="source"
                 position={Position.Right}
                 id={key} // Crucial: id must match the attribute name for the edge to connect correctly
-                className="!h-3 !w-3 !bg-pink-500"
+                className="!h-2.5 !w-2.5 !bg-pink-400"
                 style={{ top: "50%", transform: "translateY(-50%)" }}
               />
             </div>
