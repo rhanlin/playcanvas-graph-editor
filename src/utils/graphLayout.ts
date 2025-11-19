@@ -12,6 +12,8 @@ export interface BuildLayoutOptions {
   payload: SceneGraphPayload;
   manualPositions: Record<string, PositionOverride>;
   collapsedState: Record<string, boolean>;
+  projectId?: number | string | null;
+  sceneId?: number | string | null;
 }
 
 interface EntityLayoutInfo {

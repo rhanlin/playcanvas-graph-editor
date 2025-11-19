@@ -200,43 +200,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       currentEntityGuid = state.selectedEntityGuid;
     }
 
-    const finalNodes = updatedNodes.map((node) => {
-      if (
-        currentScriptNodeId &&
-        node.type === "script" &&
-        node.id === currentScriptNodeId
-      ) {
-        return { ...node, selected: true };
-      }
-      if (currentScriptNodeId && node.type === "entity") {
-        const scriptNode = updatedNodes.find(
-          (n) => n.id === currentScriptNodeId
-        );
-        if (scriptNode?.parentNode === node.id) {
-          return { ...node, selected: true };
-        }
-      }
-      if (
-        !currentScriptNodeId &&
-        currentEntityGuid &&
-        node.id === currentEntityGuid &&
-        node.type === "entity"
-      ) {
-        return { ...node, selected: true };
-      }
-      if (
-        (!currentScriptNodeId || node.id !== currentScriptNodeId) &&
-        (!currentEntityGuid || node.id !== currentEntityGuid)
-      ) {
-        return { ...node, selected: false };
-      }
-      return node;
-    });
-
-    const entityNode = updatedNodes.find(
-      (n) => n.id === currentEntityGuid && n.type === "entity"
-    );
-
     const selectionChanged =
       currentEntityGuid !== state.selectedEntityGuid ||
       currentScriptNodeId !== state.selectedScriptNodeId;
@@ -255,21 +218,74 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       }
     });
 
+    const manualUpdateKeys = Object.keys(manualUpdates);
     const manualPositions =
-      Object.keys(manualUpdates).length > 0
+      manualUpdateKeys.length > 0
         ? { ...state.manualPositions, ...manualUpdates }
         : state.manualPositions;
 
+    let baseNodes: Node[] = updatedNodes;
+    let baseEdges: Edge[] = state.edges;
+
+    if (manualUpdateKeys.length > 0) {
+      const layoutResult = buildLayoutFromState(
+        state.rootGuid,
+        state.entities,
+        state.selectedEntityName,
+        manualPositions,
+        state.collapsedState,
+        state.projectId,
+        state.sceneId
+      );
+      baseNodes = layoutResult.nodes;
+      baseEdges = layoutResult.edges;
+    }
+
+    const decorateSelection = (nodesToDecorate: Node[]): Node[] => {
+      return nodesToDecorate.map((node) => {
+        let isSelected = false;
+        if (currentScriptNodeId) {
+          if (node.id === currentScriptNodeId && node.type === "script") {
+            isSelected = true;
+          } else if (
+            currentEntityGuid &&
+            node.id === currentEntityGuid &&
+            node.type === "entity"
+          ) {
+            isSelected = true;
+          }
+        } else if (
+          currentEntityGuid &&
+          node.id === currentEntityGuid &&
+          node.type === "entity"
+        ) {
+          isSelected = true;
+        }
+
+        if (node.selected === isSelected) {
+          return node;
+        }
+
+        return { ...node, selected: isSelected };
+      });
+    };
+
+    const decoratedNodes = decorateSelection(baseNodes);
+    const selectedEntityNode = decoratedNodes.find(
+      (n) => n.id === currentEntityGuid && n.type === "entity"
+    );
+
     set({
-      nodes: finalNodes,
+      nodes: decoratedNodes,
+      edges: baseEdges,
       selectedScriptNodeId: currentScriptNodeId,
       selectedEntityGuid: currentEntityGuid,
-      selectedEntityName: entityNode?.data?.label ?? null,
+      selectedEntityName: selectedEntityNode?.data?.label ?? null,
       manualPositions,
     });
 
     if (
-      Object.keys(manualUpdates).length &&
+      manualUpdateKeys.length &&
       state.projectId != null &&
       state.sceneId != null
     ) {
@@ -532,6 +548,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         payload,
         manualPositions: layoutState.manualPositions,
         collapsedState: layoutState.collapsedState,
+        projectId: payload.projectId ?? null,
+        sceneId: payload.rootGuid ?? null,
       });
 
       return {

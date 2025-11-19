@@ -304,16 +304,23 @@
 
     const nameHandler = emitEntityUpdate;
     const parentHandler = emitEntityUpdate;
+    const childrenHandler = emitEntityUpdate;
 
     if (typeof entity.on === "function") {
       entity.on("name:set", nameHandler);
       entity.on("parent:set", parentHandler);
+      entity.on("children:insert", childrenHandler);
+      entity.on("children:remove", childrenHandler);
+      entity.on("children:move", childrenHandler);
     }
 
     disposers.push(() => {
       if (typeof entity.off === "function") {
         entity.off("name:set", nameHandler);
         entity.off("parent:set", parentHandler);
+        entity.off("children:insert", childrenHandler);
+        entity.off("children:remove", childrenHandler);
+        entity.off("children:move", childrenHandler);
       }
     });
 
