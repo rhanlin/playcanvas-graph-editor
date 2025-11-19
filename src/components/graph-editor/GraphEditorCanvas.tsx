@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
   useReactFlow,
+  type Node,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -17,6 +18,8 @@ const nodeTypes = {
   script: ScriptNode,
 };
 
+const PREVIEW_DELAY_MS = 300; // Delay before showing preview
+
 export function GraphEditorCanvas() {
   const {
     nodes,
@@ -26,8 +29,14 @@ export function GraphEditorCanvas() {
     onConnect,
     setSelectedEntity,
     clearScriptAttribute,
+    setReparentPreview,
+    reparentEntity,
+    entities,
+    rootGuid,
   } = useGraphEditorStore();
   const reactFlowInstance = useReactFlow();
+  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastHoverTargetRef = useRef<string | null>(null);
 
   const onNodeClick = useCallback(
     (_event, node) => {
@@ -48,6 +57,179 @@ export function GraphEditorCanvas() {
       }
     },
     [setSelectedEntity, nodes]
+  );
+
+  const checkIsDescendant = useCallback(
+    (entityGuid: string, candidateGuid: string | null): boolean => {
+      if (!candidateGuid || candidateGuid === entityGuid) {
+        return candidateGuid === entityGuid;
+      }
+      const candidate = entities[candidateGuid];
+      if (!candidate) {
+        return false;
+      }
+      return candidate.children.some((childId) =>
+        checkIsDescendant(entityGuid, childId)
+      );
+    },
+    [entities]
+  );
+
+  const onNodeDrag = useCallback(
+    (_event: MouseEvent, node: Node) => {
+      if (node.type !== "entity") {
+        return;
+      }
+
+      const draggingGuid = node.id;
+      const store = useGraphEditorStore.getState();
+
+      // Set dragging state on first drag
+      if (store.draggingEntityGuid !== draggingGuid) {
+        setReparentPreview(draggingGuid, null);
+      }
+
+      // Use DOM API to find the node under cursor (works correctly for nested nodes)
+      // Temporarily hide the dragging node to detect nodes underneath
+      const draggingNodeElement = document.querySelector(
+        `.react-flow__node[data-id="${draggingGuid}"], .react-flow__node[id*="${draggingGuid}"]`
+      ) as HTMLElement | null;
+      const originalPointerEvents = draggingNodeElement?.style.pointerEvents;
+      if (draggingNodeElement) {
+        draggingNodeElement.style.pointerEvents = "none";
+      }
+
+      const elementAtPoint = document.elementFromPoint(
+        _event.clientX,
+        _event.clientY
+      );
+      let hoverTarget: Node | null = null;
+
+      if (elementAtPoint) {
+        // Find the React Flow node element by traversing up the DOM tree
+        // React Flow nodes have class "react-flow__node" and data-id attribute
+        const nodeElement = (elementAtPoint as HTMLElement).closest(
+          ".react-flow__node"
+        ) as HTMLElement | null;
+
+        if (nodeElement) {
+          // Try data-id first (React Flow v11+)
+          let nodeId = nodeElement.getAttribute("data-id");
+          
+          // Fallback: try data-id from data attributes
+          if (!nodeId) {
+            nodeId = nodeElement.getAttribute("data-nodeid");
+          }
+          
+          // Fallback: extract from id attribute (format: "react-flow__node-{id}")
+          if (!nodeId) {
+            const idAttr = nodeElement.getAttribute("id");
+            if (idAttr && idAttr.startsWith("react-flow__node-")) {
+              nodeId = idAttr.replace("react-flow__node-", "");
+            }
+          }
+
+          if (nodeId && nodeId !== draggingGuid) {
+            const allNodes = reactFlowInstance.getNodes();
+            const foundNode = allNodes.find(
+              (n) => n.id === nodeId && n.type === "entity" && n.id !== draggingGuid
+            );
+            if (foundNode) {
+              hoverTarget = foundNode;
+            }
+          }
+        }
+      }
+
+      // Restore pointer events
+      if (draggingNodeElement && originalPointerEvents !== undefined) {
+        draggingNodeElement.style.pointerEvents = originalPointerEvents;
+      } else if (draggingNodeElement) {
+        draggingNodeElement.style.pointerEvents = "";
+      }
+
+      // Determine target: entity or root (null)
+      const targetGuid = hoverTarget?.id || null;
+      const isHoveringBlank = hoverTarget === null;
+
+      // Use a special marker for root reparent
+      const previewTarget = isHoveringBlank ? "ROOT" : targetGuid;
+
+      // Clear timeout if target changed
+      if (previewTarget !== lastHoverTargetRef.current) {
+        if (previewTimeoutRef.current) {
+          clearTimeout(previewTimeoutRef.current);
+          previewTimeoutRef.current = null;
+        }
+        lastHoverTargetRef.current = previewTarget;
+
+        // Validate reparent
+        if (targetGuid) {
+          // Check if target is invalid (self or descendant)
+          if (
+            targetGuid === draggingGuid ||
+            checkIsDescendant(draggingGuid, targetGuid)
+          ) {
+            // Invalid target, clear preview
+            setReparentPreview(draggingGuid, null);
+            return;
+          }
+
+          // Valid entity target, set preview after delay
+          previewTimeoutRef.current = setTimeout(() => {
+            setReparentPreview(draggingGuid, targetGuid);
+          }, PREVIEW_DELAY_MS);
+        } else {
+          // Hovering over blank canvas - allow reparent to root
+          // Check if dragging entity is already at root level
+          const draggingEntity = entities[draggingGuid];
+          const isAlreadyAtRoot =
+            !draggingEntity?.parentId || draggingEntity.parentId === rootGuid;
+
+          if (isAlreadyAtRoot) {
+            // Already at root, no need to preview
+            setReparentPreview(draggingGuid, null);
+          } else {
+            // Set preview for root reparent after delay
+            previewTimeoutRef.current = setTimeout(() => {
+              setReparentPreview(draggingGuid, "ROOT");
+            }, PREVIEW_DELAY_MS);
+          }
+        }
+      }
+    },
+    [reactFlowInstance, setReparentPreview, checkIsDescendant, entities, rootGuid]
+  );
+
+  const onNodeDragStop = useCallback(
+    (_event: MouseEvent, node: Node) => {
+      if (node.type !== "entity") {
+        return;
+      }
+
+      const draggingGuid = node.id;
+      const store = useGraphEditorStore.getState();
+      const previewParentGuid = store.previewParentGuid;
+
+      // Clear timeout
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+        previewTimeoutRef.current = null;
+      }
+      lastHoverTargetRef.current = null;
+
+      // Execute reparent if preview was active
+      if (previewParentGuid && previewParentGuid !== draggingGuid) {
+        // Convert "ROOT" marker to null for actual reparent
+        const actualParentGuid =
+          previewParentGuid === "ROOT" ? null : previewParentGuid;
+        reparentEntity(draggingGuid, actualParentGuid);
+      } else {
+        // Clear preview state
+        setReparentPreview(null, null);
+      }
+    },
+    [reparentEntity, setReparentPreview]
   );
 
   useEffect(() => {
@@ -87,7 +269,12 @@ export function GraphEditorCanvas() {
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+      }
+    };
   }, [reactFlowInstance, clearScriptAttribute]);
 
   return (
@@ -99,6 +286,8 @@ export function GraphEditorCanvas() {
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeClick={onNodeClick}
+      onNodeDrag={onNodeDrag}
+      onNodeDragStop={onNodeDragStop}
       className="h-full bg-slate-900"
       connectionRadius={40}
       fitView

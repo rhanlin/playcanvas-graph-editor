@@ -32,6 +32,8 @@ interface GraphEditorState {
   selectedEntityGuid: string | null;
   selectedScriptNodeId: string | null;
   selectedEntityName: string | null;
+  draggingEntityGuid: string | null;
+  previewParentGuid: string | null;
   isLoading: boolean;
   error: string | null;
   onNodesChange: OnNodesChange;
@@ -51,8 +53,12 @@ interface GraphEditorState {
   applyCollapseStateUpdate: (guid: string, collapsed: boolean) => void;
   reparentEntity: (
     entityGuid: string,
-    newParentGuid: string,
+    newParentGuid: string | null,
     options?: { insertIndex?: number | null; preserveTransform?: boolean }
+  ) => void;
+  setReparentPreview: (
+    draggingGuid: string | null,
+    previewParentGuid: string | null | "ROOT"
   ) => void;
   clearScriptAttribute: (
     entityGuid: string,
@@ -171,6 +177,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   selectedEntityGuid: null,
   selectedScriptNodeId: null,
   selectedEntityName: null,
+  draggingEntityGuid: null,
+  previewParentGuid: null,
   isLoading: true,
   error: null,
   onNodesChange: (changes) => {
@@ -367,23 +375,14 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   },
   onConnect: (connection: Connection) => {
     const { source, sourceHandle, target } = connection;
-    if (!source || !target) return;
+    if (!source || !sourceHandle || !target) return;
 
     const state = get();
     const sourceNode = state.nodes.find((node) => node.id === source);
-    const targetNode = state.nodes.find((node) => node.id === target);
 
-    if (
-      sourceNode?.type === "entity" &&
-      sourceHandle === "entity-reparent" &&
-      targetNode?.type === "entity" &&
-      targetNode.id !== sourceNode.id
-    ) {
-      state.reparentEntity(sourceNode.id, targetNode.id);
-      return;
-    }
-
-    if (!sourceHandle || sourceNode?.type !== "script") {
+    // Only handle script attribute connections now
+    // Reparent is handled via drag-and-drop
+    if (sourceNode?.type !== "script") {
       return;
     }
 
@@ -564,12 +563,17 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       return;
     }
 
-    if (entityGuid === newParentGuid) {
-      return;
-    }
+    // Allow null/empty string for root reparent
+    if (newParentGuid === "" || newParentGuid === null) {
+      newParentGuid = null;
+    } else {
+      if (entityGuid === newParentGuid) {
+        return;
+      }
 
-    if (newParentGuid && !state.entities[newParentGuid]) {
-      return;
+      if (!state.entities[newParentGuid]) {
+        return;
+      }
     }
 
     const isDescendant = (candidateGuid: string | null): boolean => {
@@ -604,6 +608,18 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       },
     }).catch(() => {
       // ignore connection errors
+    });
+
+    // Clear preview state after reparent
+    set({
+      draggingEntityGuid: null,
+      previewParentGuid: null,
+    });
+  },
+  setReparentPreview: (draggingGuid, previewParentGuid) => {
+    set({
+      draggingEntityGuid: draggingGuid,
+      previewParentGuid: previewParentGuid,
     });
   },
   clearScriptAttribute: (
@@ -834,6 +850,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       selectedEntityGuid: null,
       selectedScriptNodeId: null,
       selectedEntityName: null,
+      draggingEntityGuid: null,
+      previewParentGuid: null,
       isLoading: true,
       error: null,
     }),
