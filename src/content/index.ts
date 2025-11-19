@@ -173,7 +173,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (
     message?.type === "GRAPH_SET_SELECTION" ||
     message?.type === "GRAPH_UPDATE_ATTRIBUTE" ||
-    message?.type === "GRAPH_SET_COLLAPSE_STATE"
+    message?.type === "GRAPH_SET_COLLAPSE_STATE" ||
+    message?.type === "GRAPH_REPARENT_ENTITY"
   ) {
     window.postMessage(message, "*");
     return false;

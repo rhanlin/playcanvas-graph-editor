@@ -434,6 +434,52 @@
     }
   }
 
+  function handleReparentRequest(payload) {
+    const editor = window.editor;
+    if (!editor || !payload || !payload.entityGuid) {
+      return;
+    }
+
+    const entity = editor.call("entities:get", payload.entityGuid);
+    if (!entity) {
+      console.error(
+        `[GraphBridge] Cannot reparent: entity ${payload.entityGuid} not found`
+      );
+      return;
+    }
+
+    const newParentGuid = payload.newParentGuid || null;
+    const parent = newParentGuid
+      ? editor.call("entities:get", newParentGuid)
+      : editor.call("entities:root");
+
+    if (!parent) {
+      console.error(
+        `[GraphBridge] Cannot reparent: parent ${newParentGuid} not found`
+      );
+      return;
+    }
+
+    try {
+      editor.call(
+        "entities:reparent",
+        [
+          {
+            entity,
+            parent,
+            index:
+              typeof payload.insertIndex === "number"
+                ? payload.insertIndex
+                : undefined,
+          },
+        ],
+        payload.preserveTransform !== false
+      );
+    } catch (error) {
+      console.error("[GraphBridge] Failed to reparent entity", error);
+    }
+  }
+
   function registerEntityWatcher(entity) {
     if (!entity || typeof entity.get !== "function") {
       return;
@@ -654,6 +700,15 @@
         handleCollapseStateRequest(payload);
       } catch (e) {
         console.error("[GraphBridge] Failed to handle collapse update:", e);
+      }
+      return;
+    }
+
+    if (type === "GRAPH_REPARENT_ENTITY") {
+      try {
+        handleReparentRequest(payload);
+      } catch (e) {
+        console.error("[GraphBridge] Failed to handle reparent request:", e);
       }
       return;
     }

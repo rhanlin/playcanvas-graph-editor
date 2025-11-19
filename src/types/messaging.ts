@@ -53,6 +53,13 @@ export interface CollapseStateUpdatePayload {
   collapsed: boolean;
 }
 
+export interface ReparentEntityPayload {
+  entityGuid: string;
+  newParentGuid: string | null;
+  insertIndex?: number | null;
+  preserveTransform?: boolean;
+}
+
 export type RuntimeMessage =
   | { type: "GRAPH_REQUEST_DATA" }
   | { type: "GRAPH_RESPONSE_DATA"; payload: SceneGraphPayload }
@@ -67,4 +74,9 @@ export type RuntimeMessage =
   | {
       type: "GRAPH_COLLAPSE_STATE_UPDATE";
       payload: CollapseStateUpdatePayload;
-    };
+    }
+  | {
+      type: "GRAPH_SET_COLLAPSE_STATE";
+      payload: CollapseStateUpdatePayload;
+    }
+  | { type: "GRAPH_REPARENT_ENTITY"; payload: ReparentEntityPayload };

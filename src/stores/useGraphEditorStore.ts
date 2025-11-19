@@ -49,6 +49,11 @@ interface GraphEditorState {
     options?: { source?: "editor" | "extension" }
   ) => void;
   applyCollapseStateUpdate: (guid: string, collapsed: boolean) => void;
+  reparentEntity: (
+    entityGuid: string,
+    newParentGuid: string,
+    options?: { insertIndex?: number | null; preserveTransform?: boolean }
+  ) => void;
   clearScriptAttribute: (
     entityGuid: string,
     scriptName: string,
@@ -362,7 +367,25 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   },
   onConnect: (connection: Connection) => {
     const { source, sourceHandle, target } = connection;
-    if (!source || !sourceHandle || !target) return;
+    if (!source || !target) return;
+
+    const state = get();
+    const sourceNode = state.nodes.find((node) => node.id === source);
+    const targetNode = state.nodes.find((node) => node.id === target);
+
+    if (
+      sourceNode?.type === "entity" &&
+      sourceHandle === "entity-reparent" &&
+      targetNode?.type === "entity" &&
+      targetNode.id !== sourceNode.id
+    ) {
+      state.reparentEntity(sourceNode.id, targetNode.id);
+      return;
+    }
+
+    if (!sourceHandle || sourceNode?.type !== "script") {
+      return;
+    }
 
     const attributeName =
       typeof sourceHandle === "string" ? sourceHandle : String(sourceHandle);
@@ -370,10 +393,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       return;
     }
 
-    const scriptNode = get().nodes.find(
-      (node) => node.id === source && node.type === "script"
-    );
-    if (!scriptNode || !scriptNode.parentNode) {
+    const scriptNode = sourceNode;
+    if (!scriptNode.parentNode) {
       return;
     }
 
@@ -528,6 +549,62 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   },
   applyCollapseStateUpdate: (guid, collapsed) => {
     get().setEntityCollapsed(guid, collapsed, { source: "editor" });
+  },
+  reparentEntity: (
+    entityGuid,
+    newParentGuid,
+    options = { insertIndex: null, preserveTransform: true }
+  ) => {
+    if (!entityGuid) {
+      return;
+    }
+    const state = get();
+    const entity = state.entities[entityGuid];
+    if (!entity) {
+      return;
+    }
+
+    if (entityGuid === newParentGuid) {
+      return;
+    }
+
+    if (newParentGuid && !state.entities[newParentGuid]) {
+      return;
+    }
+
+    const isDescendant = (candidateGuid: string | null): boolean => {
+      if (!candidateGuid) {
+        return false;
+      }
+      if (candidateGuid === entityGuid) {
+        return true;
+      }
+      const targetEntity = state.entities[candidateGuid];
+      if (!targetEntity) {
+        return false;
+      }
+      return targetEntity.children.some((childId) => isDescendant(childId));
+    };
+
+    if (isDescendant(newParentGuid || null)) {
+      console.warn(
+        "[GraphEditor] Cannot reparent entity into its own descendant"
+      );
+      return;
+    }
+
+    sendRuntimeMessage({
+      type: "GRAPH_REPARENT_ENTITY",
+      payload: {
+        entityGuid,
+        newParentGuid: newParentGuid ?? null,
+        insertIndex:
+          typeof options.insertIndex === "number" ? options.insertIndex : null,
+        preserveTransform: options.preserveTransform !== false,
+      },
+    }).catch(() => {
+      // ignore connection errors
+    });
   },
   clearScriptAttribute: (
     entityGuid,

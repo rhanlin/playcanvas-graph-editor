@@ -62,6 +62,12 @@ export const EntityNode = memo(
           position={Position.Left}
           className="!h-3 !w-3 !bg-white/70"
         />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="entity-reparent"
+          className="!h-3 !w-3 !bg-emerald-400"
+        />
       </div>
     );
   }
