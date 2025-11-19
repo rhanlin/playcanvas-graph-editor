@@ -37,6 +37,14 @@ export interface GraphResponse {
   data?: SceneGraphPayload;
 }
 
+export interface EntityMutationPayload {
+  entity: EntityPayload;
+}
+
+export interface EntityRemovalPayload {
+  guid: string;
+}
+
 export type RuntimeMessage =
   | { type: "GRAPH_REQUEST_DATA" }
   | { type: "GRAPH_RESPONSE_DATA"; payload: SceneGraphPayload }
@@ -44,4 +52,7 @@ export type RuntimeMessage =
   | { type: "GRAPH_PUSH_DATA"; payload: GraphResponse }
   | { type: "GRAPH_UPDATE_ATTRIBUTE"; payload: UpdateAttributePayload }
   | { type: "GRAPH_UPDATE_SELECTION"; payload: UpdateSelectionPayload }
-  | { type: "GRAPH_SET_SELECTION"; payload: UpdateSelectionPayload };
+  | { type: "GRAPH_SET_SELECTION"; payload: UpdateSelectionPayload }
+  | { type: "GRAPH_ENTITY_ADDED"; payload: EntityMutationPayload }
+  | { type: "GRAPH_ENTITY_UPDATED"; payload: EntityMutationPayload }
+  | { type: "GRAPH_ENTITY_REMOVED"; payload: EntityRemovalPayload };

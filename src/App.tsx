@@ -14,6 +14,8 @@ export default function App() {
     setSelectedEntity,
     setLoading,
     setError,
+    upsertEntity,
+    removeEntity,
   } = useGraphEditorStore((state) => ({
     selectedEntityName: state.selectedEntityName,
     isLoading: state.isLoading,
@@ -22,6 +24,8 @@ export default function App() {
     setSelectedEntity: state.setSelectedEntity,
     setLoading: state.setLoading,
     setError: state.setError,
+    upsertEntity: state.upsertEntity,
+    removeEntity: state.removeEntity,
   }));
 
   const requestGraphData = useCallback(() => {
@@ -49,8 +53,6 @@ export default function App() {
       return;
     }
 
-    // This handler now listens for messages from the content script,
-    // which are forwarded from the editor bridge.
     const handler = (message: RuntimeMessage) => {
       // Handle selection updates from the editor
       if (message?.type === "GRAPH_UPDATE_SELECTION") {
@@ -58,6 +60,23 @@ export default function App() {
           message.payload.entityGuid,
           message.payload.entityName
         );
+        return;
+      }
+
+      if (
+        message?.type === "GRAPH_ENTITY_ADDED" ||
+        message?.type === "GRAPH_ENTITY_UPDATED"
+      ) {
+        if (message.payload?.entity) {
+          upsertEntity(message.payload.entity);
+        }
+        return;
+      }
+
+      if (message?.type === "GRAPH_ENTITY_REMOVED") {
+        if (message.payload?.guid) {
+          removeEntity(message.payload.guid);
+        }
         return;
       }
 
@@ -80,7 +99,7 @@ export default function App() {
     return () => {
       chrome.runtime?.onMessage?.removeListener(handler);
     };
-  }, [setGraphData, setSelectedEntity, setError]);
+  }, [setGraphData, setSelectedEntity, setError, upsertEntity, removeEntity]);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">

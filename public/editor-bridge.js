@@ -1,5 +1,6 @@
 (function () {
   let scriptNameToAssetIdMap = null;
+  const entityWatchers = new Map();
 
   /**
    * Builds a map from script names (e.g., 'playerController') to their asset IDs.
@@ -92,6 +93,52 @@
     }
 
     return components;
+  }
+
+  function normalizeChildId(child) {
+    if (!child) return null;
+    if (typeof child === "string") return child;
+    if (typeof child.get === "function") {
+      return child.get("resource_id") || null;
+    }
+    return null;
+  }
+
+  function serializeEntityData(entity) {
+    if (!entity || typeof entity.get !== "function") {
+      return null;
+    }
+
+    const guid = entity.get("resource_id");
+    if (!guid) {
+      return null;
+    }
+
+    const childrenRaw = entity.get("children") || [];
+    const children =
+      Array.isArray(childrenRaw) && childrenRaw.length > 0
+        ? childrenRaw
+            .map((child) => normalizeChildId(child))
+            .filter((id) => !!id)
+        : [];
+
+    return {
+      guid,
+      name: entity.get("name"),
+      parentId: entity.get("parent") || null,
+      children,
+      components: getEntityComponents(entity),
+    };
+  }
+
+  function postGraphMessage(type, payload) {
+    window.postMessage(
+      {
+        type,
+        payload,
+      },
+      "*"
+    );
   }
 
   /**
@@ -231,6 +278,70 @@
     }
   }
 
+  function registerEntityWatcher(entity) {
+    if (!entity || typeof entity.get !== "function") {
+      return;
+    }
+
+    const guid = entity.get("resource_id");
+    if (!guid || entityWatchers.has(guid)) {
+      return;
+    }
+
+    const disposers = [];
+
+    const emitEntityUpdate = () => {
+      const serialized = serializeEntityData(entity);
+      if (serialized) {
+        postGraphMessage("PC_GRAPH_ENTITY_UPDATED", { entity: serialized });
+      }
+    };
+
+    const nameHandler = emitEntityUpdate;
+    const parentHandler = emitEntityUpdate;
+
+    if (typeof entity.on === "function") {
+      entity.on("name:set", nameHandler);
+      entity.on("parent:set", parentHandler);
+    }
+
+    disposers.push(() => {
+      if (typeof entity.off === "function") {
+        entity.off("name:set", nameHandler);
+        entity.off("parent:set", parentHandler);
+      }
+    });
+
+    entityWatchers.set(guid, disposers);
+  }
+
+  function unregisterEntityWatcher(entityOrGuid) {
+    const guid =
+      typeof entityOrGuid === "string"
+        ? entityOrGuid
+        : entityOrGuid && typeof entityOrGuid.get === "function"
+        ? entityOrGuid.get("resource_id")
+        : null;
+
+    if (!guid || !entityWatchers.has(guid)) {
+      return;
+    }
+
+    const disposers = entityWatchers.get(guid);
+    if (Array.isArray(disposers)) {
+      disposers.forEach((dispose) => {
+        try {
+          dispose();
+        } catch (err) {
+          // eslint-disable-next-line no-console
+          console.warn("[GraphBridge] Failed to dispose entity watcher", err);
+        }
+      });
+    }
+
+    entityWatchers.delete(guid);
+  }
+
   function tryInitializeSelectorWatcher(retriesLeft = 20) {
     const editor = window.editor;
     if (!editor || typeof editor.on !== "function") {
@@ -246,6 +357,42 @@
       // eslint-disable-next-line no-console
       console.log("[GraphBridge] Editor is ready. Initializing script map...");
       scriptNameToAssetIdMap = buildScriptNameMap();
+
+      const existingEntities = editor.call("entities:list") || [];
+      if (Array.isArray(existingEntities)) {
+        existingEntities.forEach((entity) => {
+          registerEntityWatcher(entity);
+        });
+      }
+
+      editor.on("entities:add", (entity) => {
+        try {
+          registerEntityWatcher(entity);
+          const serialized = serializeEntityData(entity);
+          if (serialized) {
+            postGraphMessage("PC_GRAPH_ENTITY_ADDED", { entity: serialized });
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error("[GraphBridge] Failed to handle entity add", error);
+        }
+      });
+
+      editor.on("entities:remove", (entity) => {
+        try {
+          const guid =
+            entity && typeof entity.get === "function"
+              ? entity.get("resource_id")
+              : null;
+          unregisterEntityWatcher(entity);
+          if (guid) {
+            postGraphMessage("PC_GRAPH_ENTITY_REMOVED", { guid });
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error("[GraphBridge] Failed to handle entity removal", error);
+        }
+      });
 
       // Now that we are ready, set up the selector watcher for live updates.
       editor.on("selector:change", () => {

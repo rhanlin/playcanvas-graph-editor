@@ -10,12 +10,13 @@ import type {
 } from "reactflow";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "reactflow";
 
-import type { SceneGraphPayload } from "@/types/messaging";
+import type { EntityPayload, SceneGraphPayload } from "@/types/messaging";
 import { sendRuntimeMessage } from "@/utils/runtime";
 
 interface GraphEditorState {
   nodes: Node[];
   edges: Edge[];
+  entities: Record<string, EntityPayload>;
   selectedEntityGuid: string | null;
   selectedScriptNodeId: string | null;
   selectedEntityName: string | null;
@@ -30,6 +31,8 @@ interface GraphEditorState {
     name?: string | null,
     scriptNodeId?: string | null
   ) => void;
+  upsertEntity: (entity: EntityPayload) => void;
+  removeEntity: (guid: string) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setLoading: (value: boolean) => void;
@@ -42,9 +45,92 @@ const SCRIPT_NODE_WIDTH = 200;
 const HORIZONTAL_SPACING = 100;
 const SCRIPT_VERTICAL_OFFSET = 60;
 
+type NodeMap = Map<string, Node>;
+
+function computeNextEntityPosition(nodes: Node[]): { x: number; y: number } {
+  const entityNodes = nodes.filter((node) => node.type === "entity");
+  if (entityNodes.length === 0) {
+    return { x: 0, y: 0 };
+  }
+
+  const maxRight = Math.max(
+    ...entityNodes.map((node) => (node.position?.x ?? 0) + ENTITY_NODE_WIDTH)
+  );
+  const topMost = Math.min(...entityNodes.map((node) => node.position?.y ?? 0));
+
+  return {
+    x: maxRight + HORIZONTAL_SPACING,
+    y: topMost,
+  };
+}
+
+function buildScriptNodesAndEdges(
+  entity: EntityPayload,
+  existingNodesMap?: NodeMap
+) {
+  const scriptNodes: Node[] = [];
+  const scriptEdges: Edge[] = [];
+  const scriptComponent = entity.components?.script;
+
+  if (!scriptComponent?.scripts) {
+    return { scriptNodes, scriptEdges };
+  }
+
+  let scriptIndex = 0;
+  Object.entries(scriptComponent.scripts).forEach(
+    ([scriptName, scriptDataRaw]) => {
+      const scriptData = scriptDataRaw as {
+        attributes?: Record<string, { type: string; value: any }>;
+      };
+      const scriptNodeId = `${entity.guid}-${scriptName}`;
+      const existingScriptNode = existingNodesMap?.get(scriptNodeId);
+      const defaultPosition = existingScriptNode?.position ?? {
+        x: 10,
+        y: SCRIPT_VERTICAL_OFFSET + scriptIndex * 80,
+      };
+
+      scriptNodes.push({
+        id: scriptNodeId,
+        type: "script",
+        position: defaultPosition,
+        parentNode: entity.guid,
+        data: {
+          label: scriptName,
+          attributes: scriptData.attributes || {},
+        },
+        style: { width: SCRIPT_NODE_WIDTH },
+        selected: existingScriptNode?.selected ?? false,
+      });
+
+      if (scriptData.attributes) {
+        Object.entries(scriptData.attributes).forEach(
+          ([attrName, attrDataRaw]) => {
+            const attrData = attrDataRaw as { type: string; value: any };
+            if (attrData.type === "entity" && attrData.value) {
+              scriptEdges.push({
+                id: `${scriptNodeId}-${attrName}-${attrData.value}`,
+                source: scriptNodeId,
+                sourceHandle: attrName,
+                target: attrData.value,
+                type: "smoothstep",
+                animated: true,
+              });
+            }
+          }
+        );
+      }
+
+      scriptIndex++;
+    }
+  );
+
+  return { scriptNodes, scriptEdges };
+}
+
 export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   nodes: [],
   edges: [],
+  entities: {},
   selectedEntityGuid: null,
   selectedScriptNodeId: null,
   selectedEntityName: null,
@@ -263,6 +349,79 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       });
     }
   },
+  upsertEntity: (entity) => {
+    set((state) => {
+      const existingNodesMap: NodeMap = new Map(
+        state.nodes.map((node) => [node.id, node])
+      );
+      const existingEntityNode = existingNodesMap.get(entity.guid);
+      const nodesWithoutEntity = state.nodes.filter(
+        (node) => node.id !== entity.guid && node.parentNode !== entity.guid
+      );
+      const edgesWithoutEntityScripts = state.edges.filter(
+        (edge) => !edge.source.startsWith(`${entity.guid}-`)
+      );
+
+      const entityPosition =
+        existingEntityNode?.position ?? computeNextEntityPosition(state.nodes);
+
+      const entityNode: Node = {
+        id: entity.guid,
+        type: "entity",
+        position: entityPosition,
+        data: { label: entity.name },
+        style: { width: ENTITY_NODE_WIDTH },
+        selected: existingEntityNode?.selected ?? false,
+      };
+
+      const { scriptNodes, scriptEdges } = buildScriptNodesAndEdges(
+        entity,
+        existingNodesMap
+      );
+
+      return {
+        entities: { ...state.entities, [entity.guid]: entity },
+        nodes: [...nodesWithoutEntity, entityNode, ...scriptNodes],
+        edges: [...edgesWithoutEntityScripts, ...scriptEdges],
+        isLoading: false,
+        error: null,
+      };
+    });
+  },
+  removeEntity: (guid) => {
+    if (!get().entities[guid]) {
+      return;
+    }
+
+    set((state) => {
+      const scriptPrefix = `${guid}-`;
+      const nextEntities = { ...state.entities };
+      delete nextEntities[guid];
+
+      const nodes = state.nodes.filter(
+        (node) => node.id !== guid && node.parentNode !== guid
+      );
+      const edges = state.edges.filter(
+        (edge) => !edge.source.startsWith(scriptPrefix) && edge.target !== guid
+      );
+
+      const selectionRemoved = state.selectedEntityGuid === guid;
+      const scriptSelectionRemoved =
+        state.selectedScriptNodeId &&
+        state.selectedScriptNodeId.startsWith(scriptPrefix);
+
+      return {
+        entities: nextEntities,
+        nodes,
+        edges,
+        selectedEntityGuid: selectionRemoved ? null : state.selectedEntityGuid,
+        selectedScriptNodeId: scriptSelectionRemoved
+          ? null
+          : state.selectedScriptNodeId,
+        selectedEntityName: selectionRemoved ? null : state.selectedEntityName,
+      };
+    });
+  },
   setGraphData: (payload) => {
     const { entities } = payload;
     const existingNodesMap = new Map(
@@ -349,6 +508,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
 
     set({
       selectedEntityName: payload.selectedEntityName,
+      entities: payload.entities,
       nodes: newNodes,
       edges: newEdges,
       isLoading: false,
@@ -371,6 +531,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     set({
       nodes: [],
       edges: [],
+      entities: {},
       selectedEntityGuid: null,
       selectedScriptNodeId: null,
       selectedEntityName: null,

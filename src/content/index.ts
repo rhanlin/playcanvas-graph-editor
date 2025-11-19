@@ -85,6 +85,33 @@ window.addEventListener("message", (event: MessageEvent) => {
     return;
   }
 
+  if (data?.type === "PC_GRAPH_ENTITY_ADDED") {
+    const mutationPayload = (data as { payload?: unknown }).payload;
+    safeSendMessage({
+      type: "GRAPH_ENTITY_ADDED",
+      payload: mutationPayload,
+    });
+    return;
+  }
+
+  if (data?.type === "PC_GRAPH_ENTITY_UPDATED") {
+    const mutationPayload = (data as { payload?: unknown }).payload;
+    safeSendMessage({
+      type: "GRAPH_ENTITY_UPDATED",
+      payload: mutationPayload,
+    });
+    return;
+  }
+
+  if (data?.type === "PC_GRAPH_ENTITY_REMOVED") {
+    const mutationPayload = (data as { payload?: unknown }).payload;
+    safeSendMessage({
+      type: "GRAPH_ENTITY_REMOVED",
+      payload: mutationPayload,
+    });
+    return;
+  }
+
   // Forward selection updates from editor bridge
   if (data?.type === "PC_GRAPH_SELECTION_UPDATE") {
     const selectionData = data as {
