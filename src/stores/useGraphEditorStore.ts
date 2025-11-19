@@ -315,8 +315,23 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     const { source, sourceHandle, target } = connection;
     if (!source || !sourceHandle || !target) return;
 
-    const [entityGuid, scriptName] = source.split("-");
-    if (!entityGuid || !scriptName) return;
+    const scriptNode = get().nodes.find(
+      (node) => node.id === source && node.type === "script"
+    );
+    if (!scriptNode || !scriptNode.parentNode) {
+      return;
+    }
+
+    const scriptNodeData = (scriptNode.data || {}) as {
+      scriptName?: string;
+      label?: string;
+    };
+
+    const entityGuid = scriptNode.parentNode;
+    const scriptName = scriptNodeData.scriptName || scriptNodeData.label;
+    if (!entityGuid || !scriptName) {
+      return;
+    }
 
     set((state) => ({
       edges: addEdge(

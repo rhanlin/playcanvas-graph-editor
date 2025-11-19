@@ -114,7 +114,10 @@ export function buildGraphLayout({
         childSectionHeight;
 
     const height =
-      ENTITY_HEADER_HEIGHT + ENTITY_PADDING * 2 + dynamicHeight + (dynamicHeight > 0 ? SECTION_GAP : 0);
+      ENTITY_HEADER_HEIGHT +
+      ENTITY_PADDING * 2 +
+      dynamicHeight +
+      (dynamicHeight > 0 ? SECTION_GAP : 0);
 
     const layoutInfo: EntityLayoutInfo = {
       width: Math.max(ENTITY_MIN_WIDTH, paddingWidth),
@@ -229,6 +232,7 @@ export function buildGraphLayout({
         },
         data: {
           label: scriptName,
+          scriptName,
           attributes: scriptData.attributes || {},
         },
       });
@@ -238,11 +242,15 @@ export function buildGraphLayout({
           ([attributeName, attrDataRaw]) => {
             const attr = attrDataRaw as { type?: string; value?: any };
             if (attr.type === "entity" && attr.value) {
+              const targetGuid = String(attr.value);
+              if (!entities[targetGuid]) {
+                return;
+              }
               scriptEdgesMap.push({
-                id: `${scriptNodeId}-${attributeName}-${attr.value}`,
+                id: `${scriptNodeId}-${attributeName}-${targetGuid}`,
                 source: scriptNodeId,
                 sourceHandle: attributeName,
-                target: attr.value,
+                target: targetGuid,
                 type: "smoothstep",
                 animated: true,
                 style: { stroke: "#ec4899", strokeWidth: 2 },
@@ -302,4 +310,3 @@ export function buildGraphLayout({
 
   return { nodes, edges };
 }
-

@@ -305,6 +305,15 @@
     const nameHandler = emitEntityUpdate;
     const parentHandler = emitEntityUpdate;
     const childrenHandler = emitEntityUpdate;
+    const scriptAttributeHandler = (path) => {
+      if (typeof path !== "string") {
+        return;
+      }
+      if (!path.startsWith("components.script")) {
+        return;
+      }
+      emitEntityUpdate();
+    };
 
     if (typeof entity.on === "function") {
       entity.on("name:set", nameHandler);
@@ -312,6 +321,8 @@
       entity.on("children:insert", childrenHandler);
       entity.on("children:remove", childrenHandler);
       entity.on("children:move", childrenHandler);
+      entity.on("*:set", scriptAttributeHandler);
+      entity.on("*:unset", scriptAttributeHandler);
     }
 
     disposers.push(() => {
@@ -321,6 +332,8 @@
         entity.off("children:insert", childrenHandler);
         entity.off("children:remove", childrenHandler);
         entity.off("children:move", childrenHandler);
+        entity.off("*:set", scriptAttributeHandler);
+        entity.off("*:unset", scriptAttributeHandler);
       }
     });
 
@@ -443,18 +456,24 @@
     const path = `components.script.scripts.${scriptName}.attributes.${attributeName}`;
     const oldValue = entity.get(path);
 
-    // Use the editor's history system to make the change undoable
-    entity.history.add({
-      name: `Update ${scriptName}.${attributeName}`,
-      undo: () => {
-        entity.set(path, oldValue);
-      },
-      redo: () => {
-        entity.set(path, targetEntityGuid);
-      },
-    });
+    const history =
+      editor && editor.api && editor.api.globals
+        ? editor.api.globals.history
+        : null;
 
-    // Apply the change
+    if (history && typeof history.add === "function") {
+      history.add({
+        name: `Update ${scriptName}.${attributeName}`,
+        undo: () => {
+          entity.set(path, oldValue);
+        },
+        redo: () => {
+          entity.set(path, targetEntityGuid);
+        },
+      });
+    }
+
+    // Apply the change immediately; history undo/redo callbacks handle symmetry
     entity.set(path, targetEntityGuid);
   }
 
