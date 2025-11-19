@@ -10,3 +10,9 @@ body {
 #root {
   @apply min-h-screen;
 }
+
+.react-flow__edges,
+.react-flow__connection {
+  z-index: 6 !important;
+  pointer-events: none;
+}
