@@ -43,6 +43,12 @@ interface GraphEditorState {
     name?: string | null,
     scriptNodeId?: string | null
   ) => void;
+  setEntityCollapsed: (
+    guid: string,
+    collapsed: boolean,
+    options?: { source?: "editor" | "extension" }
+  ) => void;
+  applyCollapseStateUpdate: (guid: string, collapsed: boolean) => void;
   clearScriptAttribute: (
     entityGuid: string,
     scriptName: string,
@@ -468,6 +474,61 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       });
     }
   },
+  setEntityCollapsed: (guid, collapsed, options = { source: "extension" }) => {
+    if (!guid) {
+      return;
+    }
+
+    const source = options.source ?? "extension";
+    const state = get();
+    const currentValue = !!state.collapsedState[guid];
+    if (currentValue === collapsed) {
+      return;
+    }
+
+    const collapsedState = collapsed
+      ? { ...state.collapsedState, [guid]: true }
+      : (() => {
+          const next = { ...state.collapsedState };
+          delete next[guid];
+          return next;
+        })();
+
+    const { nodes, edges } = buildLayoutFromState(
+      state.rootGuid,
+      state.entities,
+      state.selectedEntityName,
+      state.manualPositions,
+      collapsedState,
+      state.projectId,
+      state.sceneId
+    );
+
+    set({
+      collapsedState,
+      nodes,
+      edges,
+    });
+
+    if (state.projectId != null && state.sceneId != null) {
+      persistLayoutState(
+        state.projectId,
+        state.sceneId,
+        state.manualPositions,
+        collapsedState
+      );
+    }
+
+    if (source !== "editor") {
+      sendRuntimeMessage({
+        type: "GRAPH_SET_COLLAPSE_STATE",
+        payload: { entityGuid: guid, collapsed },
+      }).catch(() => {});
+    }
+  },
+  applyCollapseStateUpdate: (guid, collapsed) => {
+    get().setEntityCollapsed(guid, collapsed, { source: "editor" });
+  },
   clearScriptAttribute: (
     entityGuid,
     scriptName,
@@ -506,33 +567,11 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     });
   },
   toggleEntityCollapse: (guid) => {
-    set((state) => {
-      const collapsedState = {
-        ...state.collapsedState,
-        [guid]: !state.collapsedState[guid],
-      };
-
-      const { nodes, edges } = buildLayoutFromState(
-        state.rootGuid,
-        state.entities,
-        state.selectedEntityName,
-        state.manualPositions,
-        collapsedState,
-        state.projectId,
-        state.sceneId
-      );
-
-      if (state.projectId != null && state.sceneId != null) {
-        persistLayoutState(
-          state.projectId,
-          state.sceneId,
-          state.manualPositions,
-          collapsedState
-        );
-      }
-
-      return { collapsedState, nodes, edges };
-    });
+    if (!guid) {
+      return;
+    }
+    const current = !!get().collapsedState[guid];
+    get().setEntityCollapsed(guid, !current, { source: "extension" });
   },
   upsertEntity: (entity) => {
     set((state) => {
@@ -654,13 +693,29 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
             collapsedState: state.collapsedState,
           };
 
+      const incomingCollapsedState =
+        payload.collapsedState && Object.keys(payload.collapsedState).length
+          ? payload.collapsedState
+          : layoutState.collapsedState;
+
+      const collapsedState = { ...incomingCollapsedState };
+
       const { nodes, edges } = buildGraphLayout({
         payload,
         manualPositions: layoutState.manualPositions,
-        collapsedState: layoutState.collapsedState,
+        collapsedState,
         projectId: payload.projectId ?? null,
-        sceneId: payload.rootGuid ?? null,
+        sceneId: payload.sceneId ?? null,
       });
+
+      if (incomingProjectId != null && incomingSceneId != null) {
+        persistLayoutState(
+          incomingProjectId,
+          incomingSceneId,
+          layoutState.manualPositions,
+          collapsedState
+        );
+      }
 
       return {
         selectedEntityName: payload.selectedEntityName,
@@ -673,7 +728,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         projectId: incomingProjectId,
         sceneId: incomingSceneId,
         manualPositions: layoutState.manualPositions,
-        collapsedState: layoutState.collapsedState,
+        collapsedState,
       };
     });
   },

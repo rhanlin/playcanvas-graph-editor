@@ -16,6 +16,7 @@ export default function App() {
     setError,
     upsertEntity,
     removeEntity,
+    applyCollapseStateUpdate,
   } = useGraphEditorStore((state) => ({
     selectedEntityName: state.selectedEntityName,
     isLoading: state.isLoading,
@@ -26,6 +27,7 @@ export default function App() {
     setError: state.setError,
     upsertEntity: state.upsertEntity,
     removeEntity: state.removeEntity,
+    applyCollapseStateUpdate: state.applyCollapseStateUpdate,
   }));
 
   const requestGraphData = useCallback(() => {
@@ -80,6 +82,16 @@ export default function App() {
         return;
       }
 
+      if (message?.type === "GRAPH_COLLAPSE_STATE_UPDATE") {
+        if (message.payload?.guid) {
+          applyCollapseStateUpdate(
+            message.payload.guid,
+            message.payload.collapsed
+          );
+        }
+        return;
+      }
+
       // We listen for GRAPH_PUSH_DATA which is now sent on selection changes
       // and initial load.
       if (message?.type !== "GRAPH_PUSH_DATA") {
@@ -99,7 +111,14 @@ export default function App() {
     return () => {
       chrome.runtime?.onMessage?.removeListener(handler);
     };
-  }, [setGraphData, setSelectedEntity, setError, upsertEntity, removeEntity]);
+  }, [
+    setGraphData,
+    setSelectedEntity,
+    setError,
+    upsertEntity,
+    removeEntity,
+    applyCollapseStateUpdate,
+  ]);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">

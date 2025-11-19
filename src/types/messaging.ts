@@ -19,6 +19,7 @@ export interface SceneGraphPayload {
   selectedEntityName: string | null;
   projectId: number | string | null;
   sceneId: number | string | null;
+  collapsedState?: Record<string, boolean>;
 }
 
 export interface UpdateAttributePayload {
@@ -47,6 +48,11 @@ export interface EntityRemovalPayload {
   guid: string;
 }
 
+export interface CollapseStateUpdatePayload {
+  guid: string;
+  collapsed: boolean;
+}
+
 export type RuntimeMessage =
   | { type: "GRAPH_REQUEST_DATA" }
   | { type: "GRAPH_RESPONSE_DATA"; payload: SceneGraphPayload }
@@ -57,4 +63,8 @@ export type RuntimeMessage =
   | { type: "GRAPH_SET_SELECTION"; payload: UpdateSelectionPayload }
   | { type: "GRAPH_ENTITY_ADDED"; payload: EntityMutationPayload }
   | { type: "GRAPH_ENTITY_UPDATED"; payload: EntityMutationPayload }
-  | { type: "GRAPH_ENTITY_REMOVED"; payload: EntityRemovalPayload };
+  | { type: "GRAPH_ENTITY_REMOVED"; payload: EntityRemovalPayload }
+  | {
+      type: "GRAPH_COLLAPSE_STATE_UPDATE";
+      payload: CollapseStateUpdatePayload;
+    };

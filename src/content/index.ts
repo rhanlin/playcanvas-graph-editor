@@ -112,6 +112,22 @@ window.addEventListener("message", (event: MessageEvent) => {
     return;
   }
 
+  if (data?.type === "PC_GRAPH_COLLAPSE_STATE") {
+    const collapsePayload = (data as {
+      payload?: { guid?: string; collapsed?: boolean };
+    }).payload;
+    if (collapsePayload?.guid) {
+      safeSendMessage({
+        type: "GRAPH_COLLAPSE_STATE_UPDATE",
+        payload: {
+          guid: collapsePayload.guid,
+          collapsed: !!collapsePayload.collapsed,
+        },
+      });
+    }
+    return;
+  }
+
   // Forward selection updates from editor bridge
   if (data?.type === "PC_GRAPH_SELECTION_UPDATE") {
     const selectionData = data as {
@@ -156,7 +172,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   // Forward selection and attribute updates to editor bridge
   if (
     message?.type === "GRAPH_SET_SELECTION" ||
-    message?.type === "GRAPH_UPDATE_ATTRIBUTE"
+    message?.type === "GRAPH_UPDATE_ATTRIBUTE" ||
+    message?.type === "GRAPH_SET_COLLAPSE_STATE"
   ) {
     window.postMessage(message, "*");
     return false;

@@ -1,6 +1,7 @@
 (function () {
   let scriptNameToAssetIdMap = null;
   const entityWatchers = new Map();
+  const collapseListenerMap = new WeakMap();
 
   /**
    * Builds a map from script names (e.g., 'playerController') to their asset IDs.
@@ -141,6 +142,132 @@
     );
   }
 
+  function getHierarchyTreeView() {
+    const editor = window.editor;
+    if (!editor || typeof editor.call !== "function") {
+      return null;
+    }
+    try {
+      return editor.call("entities:hierarchy");
+    } catch {
+      return null;
+    }
+  }
+
+  function getCollapsedStateSnapshot() {
+    const editor = window.editor;
+    if (!editor) {
+      return {};
+    }
+    const treeView = getHierarchyTreeView();
+    const rootEntity = editor.call("entities:root");
+    if (
+      !treeView ||
+      !rootEntity ||
+      typeof treeView.getExpandedState !== "function"
+    ) {
+      return {};
+    }
+
+    const expandedState = treeView.getExpandedState(rootEntity) || {};
+    const rootGuid = rootEntity.get("resource_id");
+    const collapsedState = {};
+    Object.keys(expandedState).forEach((guid) => {
+      if (guid !== rootGuid && expandedState[guid] === false) {
+        collapsedState[guid] = true;
+      }
+    });
+    return collapsedState;
+  }
+
+  function emitCollapseUpdateFromItem(item, collapsed) {
+    if (!item || !item.entity || typeof item.entity.get !== "function") {
+      return;
+    }
+    const guid = item.entity.get("resource_id");
+    if (!guid) {
+      return;
+    }
+    postGraphMessage("PC_GRAPH_COLLAPSE_STATE", {
+      guid,
+      collapsed,
+    });
+  }
+
+  function hookTreeItemForCollapse(item) {
+    if (
+      !item ||
+      typeof item.on !== "function" ||
+      collapseListenerMap.has(item)
+    ) {
+      return;
+    }
+
+    const handleOpen = () => emitCollapseUpdateFromItem(item, false);
+    const handleClose = () => emitCollapseUpdateFromItem(item, true);
+
+    item.on("open", handleOpen);
+    item.on("close", handleClose);
+
+    const cleanup = () => {
+      if (typeof item.off === "function") {
+        item.off("open", handleOpen);
+        item.off("close", handleClose);
+      }
+      collapseListenerMap.delete(item);
+    };
+
+    if (typeof item.once === "function") {
+      item.once("destroy", cleanup);
+    }
+
+    collapseListenerMap.set(item, { handleOpen, handleClose });
+  }
+
+  function hookExistingTreeItems(treeView) {
+    if (!treeView) {
+      return;
+    }
+    if (typeof treeView._traverseDepthFirst === "function") {
+      treeView._traverseDepthFirst((item) => hookTreeItemForCollapse(item));
+      return;
+    }
+    if (treeView._rootItem && typeof treeView._rootItem._dfs === "function") {
+      treeView._rootItem._dfs((item) => hookTreeItemForCollapse(item));
+    }
+  }
+
+  function patchHierarchyAppend(treeView) {
+    if (
+      !treeView ||
+      treeView.__pcGraphCollapsePatched ||
+      typeof treeView._onAppendTreeViewItem !== "function"
+    ) {
+      return;
+    }
+    const original = treeView._onAppendTreeViewItem;
+    treeView._onAppendTreeViewItem = function patched(item) {
+      hookTreeItemForCollapse(item);
+      return original.call(this, item);
+    };
+    treeView.__pcGraphCollapsePatched = true;
+  }
+
+  function initializeHierarchyCollapseWatcher(retriesLeft = 20) {
+    const treeView = getHierarchyTreeView();
+    if (!treeView) {
+      if (retriesLeft > 0) {
+        setTimeout(
+          () => initializeHierarchyCollapseWatcher(retriesLeft - 1),
+          300
+        );
+      }
+      return;
+    }
+    hookExistingTreeItems(treeView);
+    patchHierarchyAppend(treeView);
+  }
+
   /**
    * Recursively traverses the entity hierarchy to build a flat map of entities.
    * @param {object} entity - The current entity to process.
@@ -205,6 +332,7 @@
     const config = window.config || {};
     const projectId = config.project?.id ?? null;
     const sceneId = config.scene?.id ?? null;
+    const collapsedState = getCollapsedStateSnapshot();
 
     return {
       success: true,
@@ -215,6 +343,7 @@
           editor.call("selector:items")?.[0]?.get("name") || null,
         projectId,
         sceneId,
+        collapsedState,
       },
     };
   }
@@ -280,6 +409,28 @@
       editor.call("selector:set", "entity", [entity]);
     } else {
       editor.call("selector:clear");
+    }
+  }
+
+  function handleCollapseStateRequest(payload) {
+    const editor = window.editor;
+    if (!editor || !payload || !payload.entityGuid) {
+      return;
+    }
+
+    const treeView = getHierarchyTreeView();
+    if (!treeView || typeof treeView.getTreeItemForEntity !== "function") {
+      return;
+    }
+
+    const item = treeView.getTreeItemForEntity(payload.entityGuid);
+    if (!item) {
+      return;
+    }
+
+    const desiredOpen = !payload.collapsed;
+    if (item.open !== desiredOpen) {
+      item.open = desiredOpen;
     }
   }
 
@@ -390,6 +541,11 @@
         });
       }
 
+      initializeHierarchyCollapseWatcher();
+      editor.on("entities:load", () => {
+        initializeHierarchyCollapseWatcher();
+      });
+
       editor.on("entities:add", (entity) => {
         try {
           registerEntityWatcher(entity);
@@ -489,6 +645,15 @@
         handleSetSelection(payload);
       } catch (e) {
         console.error("[GraphBridge] Failed to handle set selection:", e);
+      }
+      return;
+    }
+
+    if (type === "GRAPH_SET_COLLAPSE_STATE") {
+      try {
+        handleCollapseStateRequest(payload);
+      } catch (e) {
+        console.error("[GraphBridge] Failed to handle collapse update:", e);
       }
       return;
     }
