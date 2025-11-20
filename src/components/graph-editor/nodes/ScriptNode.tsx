@@ -33,7 +33,7 @@ export const ScriptNode = memo(
     );
 
     const isCollapsed = useGraphEditorStore((state) =>
-      scriptNodeId ? !!state.scriptPanelState[scriptNodeId] : false
+      scriptNodeId ? state.scriptPanelState[scriptNodeId] ?? true : false
     );
     const toggleScriptPanel = useGraphEditorStore(
       (state) => state.toggleScriptPanel
