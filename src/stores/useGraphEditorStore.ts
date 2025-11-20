@@ -576,21 +576,32 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       }
     }
 
-    const isDescendant = (candidateGuid: string | null): boolean => {
-      if (!candidateGuid) {
+    const isDescendant = (sourceGuid: string, candidateGuid: string | null): boolean => {
+      if (!candidateGuid || !sourceGuid) {
         return false;
       }
-      if (candidateGuid === entityGuid) {
+      if (sourceGuid === candidateGuid) {
         return true;
       }
-      const targetEntity = state.entities[candidateGuid];
-      if (!targetEntity) {
+      const sourceEntity = state.entities[sourceGuid];
+      if (!sourceEntity) {
         return false;
       }
-      return targetEntity.children.some((childId) => isDescendant(childId));
+      const stack = [...(sourceEntity.children || [])];
+      while (stack.length) {
+        const currentGuid = stack.pop()!;
+        if (currentGuid === candidateGuid) {
+          return true;
+        }
+        const currentEntity = state.entities[currentGuid];
+        if (currentEntity?.children?.length) {
+          stack.push(...currentEntity.children);
+        }
+      }
+      return false;
     };
 
-    if (isDescendant(newParentGuid || null)) {
+    if (isDescendant(entityGuid, newParentGuid || null)) {
       console.warn(
         "[GraphEditor] Cannot reparent entity into its own descendant"
       );

@@ -35,11 +35,11 @@ export function GraphEditorCanvas() {
     rootGuid,
   } = useGraphEditorStore();
   const reactFlowInstance = useReactFlow();
-  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHoverTargetRef = useRef<string | null>(null);
 
   const onNodeClick = useCallback(
-    (_event, node) => {
+    (_event: React.MouseEvent, node: Node) => {
       // onNodesChange already handles selection state and notifies the editor
       // This is just a backup notification in case onNodesChange didn't catch it
       // (which shouldn't happen, but we keep it for safety)
@@ -61,22 +61,53 @@ export function GraphEditorCanvas() {
 
   const checkIsDescendant = useCallback(
     (entityGuid: string, candidateGuid: string | null): boolean => {
-      if (!candidateGuid || candidateGuid === entityGuid) {
-        return candidateGuid === entityGuid;
-      }
-      const candidate = entities[candidateGuid];
-      if (!candidate) {
+      if (!entityGuid || !candidateGuid) {
         return false;
       }
-      return candidate.children.some((childId) =>
-        checkIsDescendant(entityGuid, childId)
-      );
+      if (entityGuid === candidateGuid) {
+        return true;
+      }
+
+      const rootEntity = entities[entityGuid];
+      if (!rootEntity) {
+        return false;
+      }
+
+      const stack = [...(rootEntity.children || [])];
+      while (stack.length) {
+        const currentGuid = stack.pop()!;
+        if (currentGuid === candidateGuid) {
+          return true;
+        }
+        const currentEntity = entities[currentGuid];
+        if (currentEntity?.children?.length) {
+          stack.push(...currentEntity.children);
+        }
+      }
+      return false;
+    },
+    [entities]
+  );
+
+  const checkIsAncestor = useCallback(
+    (draggingGuid: string, targetGuid: string | null): boolean => {
+      if (!draggingGuid || !targetGuid || draggingGuid === targetGuid) {
+        return false;
+      }
+      let currentParentId = entities[draggingGuid]?.parentId ?? null;
+      while (currentParentId) {
+        if (currentParentId === targetGuid) {
+          return true;
+        }
+        currentParentId = entities[currentParentId]?.parentId ?? null;
+      }
+      return false;
     },
     [entities]
   );
 
   const onNodeDrag = useCallback(
-    (_event: MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, node: Node) => {
       if (node.type !== "entity") {
         return;
       }
@@ -88,6 +119,12 @@ export function GraphEditorCanvas() {
       if (store.draggingEntityGuid !== draggingGuid) {
         setReparentPreview(draggingGuid, null);
       }
+
+      // Debug log for drag start
+      console.log("[Reparent Debug] Dragging entity:", {
+        guid: draggingGuid,
+        label: node.data?.label,
+      });
 
       // Use DOM API to find the node under cursor (works correctly for nested nodes)
       // Temporarily hide the dragging node to detect nodes underneath
@@ -137,6 +174,10 @@ export function GraphEditorCanvas() {
             );
             if (foundNode) {
               hoverTarget = foundNode;
+              console.log("[Reparent Debug] Hover target detected:", {
+                guid: foundNode.id,
+                label: foundNode.data?.label,
+              });
             }
           }
         }
@@ -167,16 +208,32 @@ export function GraphEditorCanvas() {
         // Validate reparent
         if (targetGuid) {
           // Check if target is invalid (self or descendant)
-          if (
-            targetGuid === draggingGuid ||
-            checkIsDescendant(draggingGuid, targetGuid)
-          ) {
+          const isSelf = targetGuid === draggingGuid;
+          const isDescendant = checkIsDescendant(draggingGuid, targetGuid);
+          const isAncestor = checkIsAncestor(draggingGuid, targetGuid);
+
+          if (isSelf || isDescendant) {
             // Invalid target, clear preview
+            console.log(
+              "[Reparent Debug] Invalid target (self or descendant):",
+              {
+                draggingGuid,
+                targetGuid,
+              }
+            );
             setReparentPreview(draggingGuid, null);
             return;
           }
 
           // Valid entity target, set preview after delay
+          console.log(
+            "[Reparent Debug] Valid target detected, scheduling preview:",
+            {
+              draggingGuid,
+              targetGuid,
+              isAncestor,
+            }
+          );
           previewTimeoutRef.current = setTimeout(() => {
             setReparentPreview(draggingGuid, targetGuid);
           }, PREVIEW_DELAY_MS);
@@ -189,9 +246,13 @@ export function GraphEditorCanvas() {
 
           if (isAlreadyAtRoot) {
             // Already at root, no need to preview
+            console.log("[Reparent Debug] Hovering blank but already at root");
             setReparentPreview(draggingGuid, null);
           } else {
             // Set preview for root reparent after delay
+            console.log(
+              "[Reparent Debug] Hovering blank, scheduling root preview"
+            );
             previewTimeoutRef.current = setTimeout(() => {
               setReparentPreview(draggingGuid, "ROOT");
             }, PREVIEW_DELAY_MS);
@@ -203,13 +264,14 @@ export function GraphEditorCanvas() {
       reactFlowInstance,
       setReparentPreview,
       checkIsDescendant,
+      checkIsAncestor,
       entities,
       rootGuid,
     ]
   );
 
   const onNodeDragStop = useCallback(
-    (_event: MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, node: Node) => {
       if (node.type !== "entity") {
         return;
       }
@@ -225,11 +287,20 @@ export function GraphEditorCanvas() {
       }
       lastHoverTargetRef.current = null;
 
+      console.log("[Reparent Debug] Drag stop:", {
+        draggingGuid,
+        previewParentGuid,
+      });
+
       // Execute reparent if preview was active
       if (previewParentGuid && previewParentGuid !== draggingGuid) {
         // Convert "ROOT" marker to null for actual reparent
         const actualParentGuid =
           previewParentGuid === "ROOT" ? null : previewParentGuid;
+        console.log("[Reparent Debug] Executing reparent:", {
+          child: draggingGuid,
+          newParent: actualParentGuid ?? "ROOT",
+        });
         reparentEntity(draggingGuid, actualParentGuid);
       } else {
         // Clear preview state
