@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 
+import { ScriptAttributesPanel } from "@/components/script-attributes/ScriptAttributesPanel";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import type { ScriptAttributePayload } from "@/types/messaging";
 
@@ -23,17 +24,49 @@ export const ScriptNode = memo(
 
     const scriptName = data.scriptName || data.label;
     const entityGuid = data.entityGuid;
+    const scriptNodeId =
+      entityGuid && scriptName ? `${entityGuid}-${scriptName}` : undefined;
+
+    const isCollapsed = useGraphEditorStore((state) =>
+      scriptNodeId ? !!state.scriptPanelState[scriptNodeId] : false
+    );
+    const toggleScriptPanel = useGraphEditorStore(
+      (state) => state.toggleScriptPanel
+    );
 
     return (
       <div
-        className={`flex h-[84px] flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all ${
+        className={`flex flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all ${
           selected
             ? "border-pc-text-active bg-pc-darkest ring-2 ring-pc-text-active ring-offset-1 ring-offset-pc-darker"
             : "border-pc-text-active/40 bg-pc-dark/80"
         }`}
       >
-        <div className="font-bold text-sm text-pc-text-secondary">{data.label}</div>
-        <div className="mt-2 flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <p className="font-bold text-sm text-pc-text-secondary">
+              {data.label}
+            </p>
+            <p className="text-xs text-pc-text-dark">
+              {entityAttributes.length} entity handle
+              {entityAttributes.length === 1 ? "" : "s"} •{" "}
+              {Object.keys(data.attributes || {}).length} attributes
+            </p>
+          </div>
+          {scriptNodeId ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleScriptPanel(scriptNodeId);
+              }}
+              className="rounded-full border border-pc-border-primary/60 bg-pc-darkest px-3 py-1 text-xs font-semibold text-pc-text-secondary transition hover:border-pc-text-active hover:text-pc-text-active"
+            >
+              {isCollapsed ? "Expand" : "Collapse"}
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-col gap-2">
           {entityAttributes.length > 0 ? (
             entityAttributes.map(([key, attrData]) => {
               const attr = attrData;
@@ -79,6 +112,15 @@ export const ScriptNode = memo(
             </div>
           )}
         </div>
+        {!isCollapsed && entityGuid && scriptName ? (
+          <div className="mt-3 rounded-2xl border border-pc-border-primary/40 bg-pc-primary/50 p-3">
+            <ScriptAttributesPanel
+              entityGuid={entityGuid}
+              scriptName={scriptName}
+              attributes={data.attributes}
+            />
+          </div>
+        ) : null}
       </div>
     );
   }

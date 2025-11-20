@@ -29,6 +29,7 @@ interface GraphEditorState {
   sceneId: number | string | null;
   manualPositions: Record<string, PositionOverride>;
   collapsedState: Record<string, boolean>;
+  scriptPanelState: Record<string, boolean>;
   selectedEntityGuid: string | null;
   selectedScriptNodeId: string | null;
   selectedEntityName: string | null;
@@ -60,6 +61,8 @@ interface GraphEditorState {
     draggingGuid: string | null,
     previewParentGuid: string | null | "ROOT"
   ) => void;
+  toggleScriptPanel: (scriptNodeId: string) => void;
+  setScriptPanelState: (scriptNodeId: string, collapsed: boolean) => void;
   updateScriptAttribute: (
     entityGuid: string,
     scriptName: string,
@@ -181,6 +184,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   sceneId: null,
   manualPositions: {},
   collapsedState: {},
+  scriptPanelState: {},
   selectedEntityGuid: null,
   selectedScriptNodeId: null,
   selectedEntityName: null,
@@ -632,6 +636,27 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       draggingEntityGuid: draggingGuid,
       previewParentGuid: previewParentGuid,
     });
+  },
+  toggleScriptPanel: (scriptNodeId) => {
+    if (!scriptNodeId) return;
+    set((state) => {
+      const current = !!state.scriptPanelState[scriptNodeId];
+      return {
+        scriptPanelState: {
+          ...state.scriptPanelState,
+          [scriptNodeId]: !current,
+        },
+      };
+    });
+  },
+  setScriptPanelState: (scriptNodeId, collapsed) => {
+    if (!scriptNodeId) return;
+    set((state) => ({
+      scriptPanelState: {
+        ...state.scriptPanelState,
+        [scriptNodeId]: collapsed,
+      },
+    }));
   },
   updateScriptAttribute: (
     entityGuid,

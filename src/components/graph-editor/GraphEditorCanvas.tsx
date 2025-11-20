@@ -107,8 +107,8 @@ export function GraphEditorCanvas() {
   );
 
   const onNodeDrag = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      if (node.type !== "entity") {
+    (_event: React.MouseEvent, node: Node | undefined) => {
+      if (!node || node.type !== "entity") {
         return;
       }
 
@@ -242,8 +242,8 @@ export function GraphEditorCanvas() {
   );
 
   const onNodeDragStop = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
-      if (node.type !== "entity") {
+    (_event: React.MouseEvent, node: Node | undefined) => {
+      if (!node || node.type !== "entity") {
         return;
       }
 
