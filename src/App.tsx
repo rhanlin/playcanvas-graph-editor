@@ -58,7 +58,6 @@ export default function App() {
     const handler = (message: RuntimeMessage) => {
       // Handle selection updates from the editor
       if (message?.type === "GRAPH_UPDATE_SELECTION") {
-        console.log("[GraphFocus] GRAPH_UPDATE_SELECTION", message.payload);
         setSelectedEntity(
           message.payload.entityGuid,
           message.payload.entityName

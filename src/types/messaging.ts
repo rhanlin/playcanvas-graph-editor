@@ -13,6 +13,14 @@ export interface ScriptAttributeDefinition {
   step?: number;
   visibleif?: unknown;
   array?: boolean;
+  schema?: Array<{
+    name: string;
+    type: string;
+    title?: string;
+    description?: string;
+    default?: any;
+    [key: string]: any;
+  }>;
   [key: string]: any;
 }
 

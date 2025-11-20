@@ -574,11 +574,21 @@ const AttributeInput = ({
     );
   }
 
-  if (type === "array") {
+  // Handle array types (both "array" and "json" with array: true)
+  if (type === "array" || (type === "json" && definition?.array === true)) {
     const list = Array.isArray(value) ? value : [];
-    return <ArrayField current={list} onChange={onChange} />;
+    return (
+      <ArrayField
+        current={list}
+        onChange={onChange}
+        definition={definition}
+        entities={entities}
+        entityGuid={entityGuid}
+      />
+    );
   }
 
+  // Handle non-array json/object types
   if (type === "json" || type === "object") {
     return (
       <textarea
@@ -702,17 +712,144 @@ const VectorField = ({
 type ArrayFieldProps = {
   current: unknown[];
   onChange: (next: unknown[]) => void;
+  definition?: ScriptAttributeDefinition;
+  entities?: Record<string, EntityPayload>;
+  entityGuid?: string;
+  updateScriptAttribute?: (
+    entityGuid: string,
+    scriptName: string,
+    attributeName: string,
+    value: any
+  ) => void;
+  scriptName?: string;
 };
 
-const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
-  const handleItemChange = (index: number, next: string) => {
+// Helper to get default value for a schema field
+const getDefaultValueForSchemaField = (
+  field: NonNullable<ScriptAttributeDefinition["schema"]>[0]
+): any => {
+  if (field.default !== undefined) {
+    return field.default;
+  }
+  switch (field.type) {
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    case "string":
+      return "";
+    case "entity":
+      return null;
+    case "vec2":
+      return [0, 0];
+    case "vec3":
+      return [0, 0, 0];
+    case "vec4":
+      return [0, 0, 0, 0];
+    default:
+      return null;
+  }
+};
+
+// Component to render a single object in an array:json field
+type JsonObjectFieldProps = {
+  value: Record<string, any>;
+  schema: NonNullable<ScriptAttributeDefinition["schema"]>;
+  onChange: (next: Record<string, any>) => void;
+  entities?: Record<string, EntityPayload>;
+  entityGuid?: string;
+};
+
+const JsonObjectField = ({
+  value,
+  schema,
+  onChange,
+  entities,
+  entityGuid,
+}: JsonObjectFieldProps) => {
+  const handleFieldChange = (fieldName: string, fieldValue: any) => {
+    onChange({
+      ...value,
+      [fieldName]: fieldValue,
+    });
+  };
+
+  return (
+    <div className="space-y-3 rounded-xl border border-pc-border-primary/50 bg-pc-dark p-3">
+      {schema.map((field) => {
+        const fieldValue =
+          value?.[field.name] ?? getDefaultValueForSchemaField(field);
+        const fieldLabel = field.title || field.name;
+        const fieldDescription = field.description;
+
+        return (
+          <div key={field.name} className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-pc-text-primary">
+                {fieldLabel}
+              </label>
+              {fieldDescription && (
+                <span className="text-[10px] text-pc-text-dark">
+                  {fieldDescription}
+                </span>
+              )}
+            </div>
+            {entities && entityGuid ? (
+              <AttributeInput
+                value={fieldValue}
+                attribute={{
+                  type: field.type,
+                  value: fieldValue,
+                  definition: field,
+                }}
+                definition={field}
+                onChange={(next) => handleFieldChange(field.name, next)}
+                entities={entities}
+                entityGuid={entityGuid}
+                attributeKey={field.name}
+              />
+            ) : (
+              <div className="text-xs text-pc-text-dark">
+                Entity context required for editing
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const ArrayField = ({
+  current,
+  onChange,
+  definition,
+  entities,
+  entityGuid,
+}: ArrayFieldProps) => {
+  const hasSchema =
+    definition?.schema &&
+    Array.isArray(definition.schema) &&
+    definition.schema.length > 0;
+
+  const handleItemChange = (index: number, next: unknown) => {
     const nextValues = [...current];
-    nextValues[index] = parseArrayValue(next);
+    nextValues[index] = next;
     onChange(nextValues);
   };
 
   const addItem = () => {
-    onChange([...current, ""]);
+    if (hasSchema) {
+      // Create a new object with default values from schema
+      const newObject: Record<string, any> = {};
+      definition.schema!.forEach((field) => {
+        newObject[field.name] = getDefaultValueForSchemaField(field);
+      });
+      onChange([...current, newObject]);
+    } else {
+      // Simple array, add empty string
+      onChange([...current, ""]);
+    }
   };
 
   const removeItem = (index: number) => {
@@ -720,6 +857,59 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
     onChange(next);
   };
 
+  // Render array:json with schema
+  if (hasSchema) {
+    return (
+      <div className="space-y-3">
+        {current.map((entry, index) => {
+          const objValue =
+            typeof entry === "object" && entry !== null && !Array.isArray(entry)
+              ? (entry as Record<string, any>)
+              : {};
+
+          return (
+            <div
+              key={`${index}-${JSON.stringify(entry)}`}
+              className="relative space-y-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-pc-text-secondary">
+                  Item {index + 1}
+                </span>
+                <button
+                  type="button"
+                  onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+                  onMouseUpCapture={stopReactFlowEventWithPreventDefault}
+                  onClick={withStopPropagation(() => removeItem(index))}
+                  className="rounded-lg border border-pc-border-primary/60 px-2 py-1 text-xs text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
+                >
+                  Remove
+                </button>
+              </div>
+              <JsonObjectField
+                value={objValue}
+                schema={definition.schema!}
+                onChange={(next) => handleItemChange(index, next)}
+                entities={entities}
+                entityGuid={entityGuid}
+              />
+            </div>
+          );
+        })}
+        <button
+          type="button"
+          onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+          onMouseUpCapture={stopReactFlowEventWithPreventDefault}
+          onClick={withStopPropagation(addItem)}
+          className="w-full rounded-lg border border-dashed border-pc-border-primary/60 px-3 py-2 text-sm text-pc-text-secondary hover:border-pc-text-active"
+        >
+          + Add Item
+        </button>
+      </div>
+    );
+  }
+
+  // Render simple array (fallback to original behavior)
   return (
     <div className="space-y-2">
       {current.map((entry, index) => (
@@ -731,7 +921,10 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
             type="text"
             value={String(entry ?? "")}
             onPointerDownCapture={stopReactFlowEvent}
-            onChange={(event) => handleItemChange(index, event.target.value)}
+            onChange={(event) => {
+              const parsed = parseArrayValue(event.target.value);
+              handleItemChange(index, parsed);
+            }}
             className="flex-1 rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
           />
           <button

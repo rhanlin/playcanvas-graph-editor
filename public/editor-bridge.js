@@ -127,11 +127,6 @@
         let assetId = scriptNameToAssetIdMap.get(scriptName);
         let definitions = null;
 
-        console.log(
-          "[GraphBridge] scriptNameToAssetIdMap:",
-          scriptNameToAssetIdMap
-        );
-
         if (!assetId) {
           // Try to find the asset by searching for it directly (lazy lookup)
           // This avoids rebuilding the entire map

@@ -348,11 +348,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     }
 
     if (selectionChanged && currentEntityGuid) {
-      console.log("[GraphFocus] onNodesChange selectionChanged", {
-        currentEntityGuid,
-        currentScriptNodeId,
-        changes,
-      });
       sendRuntimeMessage({
         type: "GRAPH_SET_SELECTION",
         payload: { entityGuid: currentEntityGuid },
@@ -459,12 +454,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
 
     const stateAlreadyCorrect =
       selectedEntityGuid === guid && selectedScriptNodeId === newScriptNodeId;
-
-    console.log("[GraphFocus] setSelectedEntity", {
-      guid,
-      scriptNodeId,
-      from: "store",
-    });
 
     if (!stateAlreadyCorrect) {
       set({
