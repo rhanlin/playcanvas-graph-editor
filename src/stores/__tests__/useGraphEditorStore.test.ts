@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Node } from "reactflow";
 
 import { useGraphEditorStore } from "../useGraphEditorStore";
 import type { EntityPayload } from "@/types/messaging";
@@ -21,7 +22,18 @@ const baseEntities: Record<string, EntityPayload> = {
     name: "Level 1",
     parentId: "root",
     children: ["level-2"],
-    components: {},
+    components: {
+      script: {
+        scripts: {
+          moveScript: {
+            enabled: true,
+            attributes: {
+              target: { type: "entity", value: null },
+            },
+          },
+        },
+      },
+    },
   },
   "level-2": {
     guid: "level-2",
@@ -45,6 +57,22 @@ beforeEach(() => {
     projectId: 100,
     sceneId: 200,
     isLoading: false,
+    nodes: [
+      {
+        id: "level-1-moveScript",
+        type: "script",
+        parentNode: "level-1",
+        position: { x: 0, y: 0 },
+        data: {
+          label: "moveScript",
+          scriptName: "moveScript",
+          entityGuid: "level-1",
+          attributes: {
+            target: { type: "entity", value: null },
+          },
+        },
+      } as Node,
+    ],
   });
   vi.clearAllMocks();
 });
@@ -77,5 +105,34 @@ describe("useGraphEditorStore.reparentEntity", () => {
       "[GraphEditor] Cannot reparent entity into its own descendant"
     );
     warnSpy.mockRestore();
+  });
+});
+
+describe("useGraphEditorStore.updateScriptAttribute", () => {
+  it("updates local state and forwards payload to runtime", () => {
+    const { updateScriptAttribute } = useGraphEditorStore.getState();
+
+    updateScriptAttribute("level-1", "moveScript", "target", "level-2");
+
+    expect(sendRuntimeMessage).toHaveBeenCalledWith({
+      type: "GRAPH_UPDATE_ATTRIBUTE",
+      payload: {
+        entityGuid: "level-1",
+        scriptName: "moveScript",
+        attributeName: "target",
+        value: "level-2",
+      },
+    });
+
+    const entities = useGraphEditorStore.getState().entities;
+    expect(
+      entities["level-1"].components?.script?.scripts?.moveScript?.attributes
+        ?.target?.value
+    ).toBe("level-2");
+
+    const scriptNode = useGraphEditorStore
+      .getState()
+      .nodes.find((node) => node.id === "level-1-moveScript");
+    expect(scriptNode?.data?.attributes?.target?.value).toBe("level-2");
   });
 });

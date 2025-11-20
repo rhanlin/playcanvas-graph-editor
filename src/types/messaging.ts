@@ -1,8 +1,30 @@
 export type GraphNodeType = "entity" | "script"; // This might expand later
 
+export interface ScriptAttributeDefinition {
+  type: string;
+  title?: string;
+  description?: string;
+  default?: any;
+  placeholder?: string;
+  enum?: { options?: Record<string, string | number | boolean> };
+  options?: Record<string, any>;
+  min?: number;
+  max?: number;
+  step?: number;
+  visibleif?: unknown;
+  array?: boolean;
+  [key: string]: any;
+}
+
+export interface ScriptAttributePayload {
+  type: string;
+  value: any;
+  definition?: ScriptAttributeDefinition;
+}
+
 export interface ComponentPayload {
   [key: string]: any;
-  attributes?: Record<string, { type: string; value: any }>;
+  attributes?: Record<string, ScriptAttributePayload>;
 }
 
 export interface EntityPayload {
@@ -26,7 +48,7 @@ export interface UpdateAttributePayload {
   entityGuid: string;
   scriptName: string;
   attributeName: string;
-  targetEntityGuid: string | null; // null to clear the attribute
+  value: any;
 }
 
 export interface UpdateSelectionPayload {

@@ -2,18 +2,13 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
+import type { ScriptAttributePayload } from "@/types/messaging";
 
 type ScriptNodeData = {
   label: string;
   scriptName?: string;
   entityGuid?: string;
-  attributes?: Record<
-    string,
-    {
-      type?: string;
-      value?: unknown;
-    }
-  >;
+  attributes?: Record<string, ScriptAttributePayload>;
 };
 
 export const ScriptNode = memo(
@@ -23,10 +18,7 @@ export const ScriptNode = memo(
     );
 
     const entityAttributes = Object.entries(data.attributes || {}).filter(
-      ([, attrData]) => {
-        const attr = attrData as { type?: string; value?: unknown };
-        return attr.type === "entity";
-      }
+      ([, attr]) => attr?.type === "entity"
     );
 
     const scriptName = data.scriptName || data.label;
@@ -44,8 +36,8 @@ export const ScriptNode = memo(
         <div className="mt-2 flex flex-col gap-2">
           {entityAttributes.length > 0 ? (
             entityAttributes.map(([key, attrData]) => {
-              const attr = attrData as { type?: string; value?: unknown };
-              const isLinked = !!attr.value;
+              const attr = attrData;
+              const isLinked = !!attr?.value;
               return (
                 <div
                   key={key}

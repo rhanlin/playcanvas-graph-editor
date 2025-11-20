@@ -60,6 +60,13 @@ interface GraphEditorState {
     draggingGuid: string | null,
     previewParentGuid: string | null | "ROOT"
   ) => void;
+  updateScriptAttribute: (
+    entityGuid: string,
+    scriptName: string,
+    attributeName: string,
+    value: unknown,
+    options?: { sendRuntime?: boolean }
+  ) => void;
   clearScriptAttribute: (
     entityGuid: string,
     scriptName: string,
@@ -379,6 +386,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
 
     const state = get();
     const sourceNode = state.nodes.find((node) => node.id === source);
+    const updateScriptAttribute = state.updateScriptAttribute;
 
     // Only handle script attribute connections now
     // Reparent is handled via drag-and-drop
@@ -424,18 +432,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       ),
     }));
 
-    sendRuntimeMessage({
-      type: "GRAPH_UPDATE_ATTRIBUTE",
-      payload: {
-        entityGuid,
-        scriptName,
-        attributeName,
-        targetEntityGuid: target,
-      },
-    }).catch((err) => {
-      // Silently ignore errors when content script is not ready
-      // This can happen during initialization
-    });
+    updateScriptAttribute(entityGuid, scriptName, attributeName, target);
   },
   setSelectedEntity: (guid, name, scriptNodeId) => {
     const state = get();
@@ -576,7 +573,10 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       }
     }
 
-    const isDescendant = (sourceGuid: string, candidateGuid: string | null): boolean => {
+    const isDescendant = (
+      sourceGuid: string,
+      candidateGuid: string | null
+    ): boolean => {
       if (!candidateGuid || !sourceGuid) {
         return false;
       }
@@ -633,6 +633,113 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       previewParentGuid: previewParentGuid,
     });
   },
+  updateScriptAttribute: (
+    entityGuid,
+    scriptName,
+    attributeName,
+    value,
+    options = { sendRuntime: true }
+  ) => {
+    if (!entityGuid || !scriptName || !attributeName) {
+      return;
+    }
+
+    set((state) => {
+      const entity = state.entities[entityGuid];
+      const scriptComponent = entity?.components?.script;
+      const scriptInstance = scriptComponent?.scripts
+        ? scriptComponent.scripts[scriptName]
+        : undefined;
+
+      if (!entity || !scriptInstance) {
+        return {};
+      }
+
+      const currentAttributes = scriptInstance.attributes || {};
+      const currentAttribute = currentAttributes[attributeName] || {};
+
+      const updatedAttribute = {
+        ...currentAttribute,
+        value,
+      };
+
+      const updatedAttributes = {
+        ...currentAttributes,
+        [attributeName]: updatedAttribute,
+      };
+
+      const updatedScriptInstance = {
+        ...scriptInstance,
+        attributes: updatedAttributes,
+      };
+
+      const updatedScripts = {
+        ...scriptComponent.scripts,
+        [scriptName]: updatedScriptInstance,
+      };
+
+      const updatedScriptComponent = {
+        ...scriptComponent,
+        scripts: updatedScripts,
+      };
+
+      const updatedComponents = {
+        ...entity.components,
+        script: updatedScriptComponent,
+      };
+
+      const updatedEntities = {
+        ...state.entities,
+        [entityGuid]: {
+          ...entity,
+          components: updatedComponents,
+        },
+      };
+
+      const updatedNodes = state.nodes.map((node) => {
+        if (
+          node.type === "script" &&
+          node.id === `${entityGuid}-${scriptName}`
+        ) {
+          const data = node.data || {};
+          const nextAttributes = {
+            ...(data.attributes || {}),
+            [attributeName]: {
+              ...(data.attributes?.[attributeName] || {}),
+              value,
+            },
+          };
+          return {
+            ...node,
+            data: {
+              ...data,
+              attributes: nextAttributes,
+            },
+          };
+        }
+        return node;
+      });
+
+      return {
+        entities: updatedEntities,
+        nodes: updatedNodes,
+      };
+    });
+
+    if (options.sendRuntime !== false) {
+      sendRuntimeMessage({
+        type: "GRAPH_UPDATE_ATTRIBUTE",
+        payload: {
+          entityGuid,
+          scriptName,
+          attributeName,
+          value,
+        },
+      }).catch(() => {
+        // silently ignore connection errors
+      });
+    }
+  },
   clearScriptAttribute: (
     entityGuid,
     scriptName,
@@ -658,17 +765,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       }));
     }
 
-    sendRuntimeMessage({
-      type: "GRAPH_UPDATE_ATTRIBUTE",
-      payload: {
-        entityGuid,
-        scriptName,
-        attributeName,
-        targetEntityGuid: null,
-      },
-    }).catch(() => {
-      // silently ignore connection errors
-    });
+    get().updateScriptAttribute(entityGuid, scriptName, attributeName, null);
   },
   toggleEntityCollapse: (guid) => {
     if (!guid) {

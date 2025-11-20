@@ -1,6 +1,10 @@
 import type { Edge, Node, XYPosition } from "reactflow";
 
-import type { EntityPayload, SceneGraphPayload } from "@/types/messaging";
+import type {
+  EntityPayload,
+  SceneGraphPayload,
+  ScriptAttributePayload,
+} from "@/types/messaging";
 
 export interface PositionOverride {
   x: number;
@@ -247,7 +251,7 @@ export function buildGraphLayout({
       );
 
       const scriptData = scriptDataRaw as {
-        attributes?: Record<string, { type: string; value: any }>;
+        attributes?: Record<string, ScriptAttributePayload>;
       };
 
       nodes.push({
@@ -276,8 +280,8 @@ export function buildGraphLayout({
       if (scriptData.attributes) {
         Object.entries(scriptData.attributes).forEach(
           ([attributeName, attrDataRaw]) => {
-            const attr = attrDataRaw as { type?: string; value?: any };
-            if (attr.type === "entity" && attr.value) {
+            const attr = attrDataRaw as ScriptAttributePayload;
+            if (attr?.type === "entity" && attr.value) {
               const targetGuid = String(attr.value);
               if (!entities[targetGuid]) {
                 return;

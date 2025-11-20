@@ -3,6 +3,48 @@
   const entityWatchers = new Map();
   const collapseListenerMap = new WeakMap();
 
+  function inferAttributeType(value) {
+    if (value === null || value === undefined) {
+      return null;
+    }
+    if (Array.isArray(value)) {
+      if (value.length === 2) return "vec2";
+      if (value.length === 3) return "vec3";
+      if (value.length === 4) return "vec4";
+      return "array";
+    }
+    const type = typeof value;
+    if (type === "string") return "string";
+    if (type === "number") return "number";
+    if (type === "boolean") return "boolean";
+    if (type === "object") return "json";
+    return null;
+  }
+
+  function cloneDefinition(definition) {
+    if (!definition) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(JSON.stringify(definition));
+    } catch {
+      return definition;
+    }
+  }
+
+  function resolveAttributeValue(definition, value) {
+    if (value !== undefined) {
+      return value;
+    }
+    if (
+      definition &&
+      Object.prototype.hasOwnProperty.call(definition, "default")
+    ) {
+      return definition.default;
+    }
+    return null;
+  }
+
   /**
    * Builds a map from script names (e.g., 'playerController') to their asset IDs.
    * This is done once and cached for performance.
@@ -30,6 +72,7 @@
    */
   function getEntityComponents(entity) {
     const components = {};
+    const editor = window.editor;
     // This is a simplified list. We may need to add more component types
     // and their relevant properties as the tool develops.
     const componentTypes = [
@@ -49,7 +92,7 @@
     });
 
     // Special handling for scripts to get attributes
-    if (components.script && components.script.scripts) {
+    if (components.script && components.script.scripts && editor) {
       // Now, iterate through the script instances on the entity
       Object.keys(components.script.scripts).forEach((scriptName) => {
         const scriptComponentInstance = components.script.scripts[scriptName];
@@ -74,19 +117,31 @@
         }
 
         // Get the schema (definitions) from the asset data
-        const definitions = asset.get(`data.scripts.${scriptName}.attributes`);
+        const definitions =
+          asset.get(`data.scripts.${scriptName}.attributes`) || null;
         // Get the values from the entity's component instance
-        const values = scriptComponentInstance.attributes;
-        if (definitions && values) {
-          for (const attrName in definitions) {
-            if (Object.prototype.hasOwnProperty.call(values, attrName)) {
-              newAttributes[attrName] = {
-                type: definitions[attrName].type,
-                value: values[attrName],
-              };
-            }
-          }
-        }
+        const values = scriptComponentInstance.attributes || {};
+
+        const attributeNames = new Set([
+          ...Object.keys(definitions || {}),
+          ...Object.keys(values || {}),
+        ]);
+
+        attributeNames.forEach((attrName) => {
+          const definition = definitions ? definitions[attrName] : null;
+          const rawValue = Object.prototype.hasOwnProperty.call(values, attrName)
+            ? values[attrName]
+            : undefined;
+          const resolvedValue = resolveAttributeValue(definition, rawValue);
+          const attributeType =
+            (definition && definition.type) || inferAttributeType(rawValue) || "json";
+
+          newAttributes[attrName] = {
+            type: attributeType,
+            value: resolvedValue,
+            definition: cloneDefinition(definition),
+          };
+        });
 
         // Replace the old attributes object with our new, detailed one.
         scriptComponentInstance.attributes = newAttributes;
@@ -334,9 +389,9 @@
     const sceneId = config.scene?.id ?? null;
     const collapsedState = getCollapsedStateSnapshot();
 
-    return {
-      success: true,
-      data: {
+      return {
+        success: true,
+        data: {
         rootGuid,
         entities: Object.fromEntries(entitiesMap),
         selectedEntityName:
@@ -622,17 +677,17 @@
       });
 
       // Now that we are ready, set up the selector watcher for live updates.
-      editor.on("selector:change", () => {
-        try {
+    editor.on("selector:change", () => {
+      try {
           broadcastSelectionUpdate();
-        } catch (error) {
-          // eslint-disable-next-line no-console
-          console.error("[GraphBridge] selector update failed", error);
-        }
-      });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error("[GraphBridge] selector update failed", error);
+      }
+    });
 
       // And perform the initial broadcast to load the scene graph.
-      broadcastSelection();
+    broadcastSelection();
       // Also broadcast initial selection state
       broadcastSelectionUpdate();
     });
@@ -640,7 +695,7 @@
 
   function handleAttributeUpdate(payload) {
     const editor = window.editor;
-    const { entityGuid, scriptName, attributeName, targetEntityGuid } = payload;
+    const { entityGuid, scriptName, attributeName } = payload || {};
 
     if (!editor || !entityGuid || !scriptName || !attributeName) {
       console.error("[GraphBridge] Invalid attribute update payload", payload);
@@ -657,6 +712,9 @@
 
     const path = `components.script.scripts.${scriptName}.attributes.${attributeName}`;
     const oldValue = entity.get(path);
+    const nextValue = Object.prototype.hasOwnProperty.call(payload, "value")
+      ? payload.value
+      : payload?.targetEntityGuid ?? null;
 
     const history =
       editor && editor.api && editor.api.globals
@@ -670,13 +728,13 @@
           entity.set(path, oldValue);
         },
         redo: () => {
-          entity.set(path, targetEntityGuid);
+          entity.set(path, nextValue);
         },
       });
     }
 
     // Apply the change immediately; history undo/redo callbacks handle symmetry
-    entity.set(path, targetEntityGuid);
+    entity.set(path, nextValue);
   }
 
   window.addEventListener("message", (event) => {
