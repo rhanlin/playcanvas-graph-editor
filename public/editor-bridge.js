@@ -52,17 +52,37 @@
    */
   function buildScriptNameMap() {
     const newMap = new Map();
+    const editor = window.editor;
+    if (!editor || !editor.call) {
+      console.warn("[GraphBridge] Editor not available for buildScriptNameMap");
+      return newMap;
+    }
+
     const scriptAssets = editor.call("assets:list", { type: "script" });
+
     scriptAssets.forEach((asset) => {
-      const assetScripts = asset.get("data.scripts");
-      if (assetScripts) {
-        Object.keys(assetScripts).forEach((scriptName) => {
-          // A script name can exist in multiple files (e.g. forks),
-          // but for now we'll just take the last one we find.
-          newMap.set(scriptName, asset.get("id"));
-        });
+      try {
+        const assetId = asset.get("id");
+        const assetScripts = asset.get("data.scripts");
+        // Only process assets that have data.scripts loaded
+        // Some assets may not have data.scripts yet (e.g., still loading), which is normal
+        if (assetScripts && typeof assetScripts === "object") {
+          const scriptNames = Object.keys(assetScripts);
+          scriptNames.forEach((scriptName) => {
+            // A script name can exist in multiple files (e.g. forks),
+            // but for now we'll just take the last one we find.
+            newMap.set(scriptName, assetId);
+          });
+        }
+        // Silently skip assets without data.scripts (they may be loading or not script assets)
+      } catch (error) {
+        console.error(
+          `[GraphBridge] Error processing asset in buildScriptNameMap:`,
+          error
+        );
       }
     });
+
     return newMap;
   }
   /**
@@ -93,26 +113,117 @@
 
     // Special handling for scripts to get attributes
     if (components.script && components.script.scripts && editor) {
+      // Ensure map is initialized once before the loop
+      if (!scriptNameToAssetIdMap) {
+        scriptNameToAssetIdMap = buildScriptNameMap();
+      }
+
       // Now, iterate through the script instances on the entity
       Object.keys(components.script.scripts).forEach((scriptName) => {
         const scriptComponentInstance = components.script.scripts[scriptName];
         const newAttributes = {};
 
         // Find the corresponding asset ID from our global map
-        const assetId = scriptNameToAssetIdMap.get(scriptName);
+        let assetId = scriptNameToAssetIdMap.get(scriptName);
         let definitions = null;
+
+        console.log(
+          "[GraphBridge] scriptNameToAssetIdMap:",
+          scriptNameToAssetIdMap
+        );
+
         if (!assetId) {
-          // eslint-disable-next-line no-console
+          // Try to find the asset by searching for it directly (lazy lookup)
+          // This avoids rebuilding the entire map
+          const scriptAssets = editor.call("assets:list", { type: "script" });
+          let foundAssetId = null;
+          let maxAssetId = 0;
+
+          for (const asset of scriptAssets) {
+            try {
+              const assetScripts = asset.get("data.scripts");
+              if (assetScripts && typeof assetScripts === "object") {
+                if (
+                  Object.prototype.hasOwnProperty.call(assetScripts, scriptName)
+                ) {
+                  const candidateId = asset.get("id");
+                  // If multiple assets have the same script name (e.g., after re-upload),
+                  // choose the one with the highest ID (newest asset)
+                  if (candidateId > maxAssetId) {
+                    maxAssetId = candidateId;
+                    foundAssetId = candidateId;
+                  }
+                }
+              }
+            } catch (error) {
+              // Skip assets that can't be read
+            }
+          }
+
+          if (foundAssetId) {
+            assetId = foundAssetId;
+            // Update the map for future lookups
+            scriptNameToAssetIdMap.set(scriptName, assetId);
+          }
+        }
+
+        if (!assetId) {
           console.warn(
             `[GraphBridge] Could not find asset ID for script "${scriptName}" in the project-wide map. Falling back to inferred attribute types.`
           );
         } else {
           // Get the asset using the ID
-          const asset = editor.call("assets:get", assetId);
+          let asset = editor.call("assets:get", assetId);
           if (!asset) {
-            // eslint-disable-next-line no-console
+            // Asset might have been re-uploaded and the ID is stale.
+            // Try lazy lookup again to find the new asset ID
+            // When multiple assets have the same script name, choose the one with highest ID (newest)
+            const scriptAssets = editor.call("assets:list", { type: "script" });
+            let foundAsset = null;
+            let foundAssetId = null;
+            let maxAssetId = 0;
+
+            for (const candidateAsset of scriptAssets) {
+              try {
+                const assetScripts = candidateAsset.get("data.scripts");
+                if (assetScripts && typeof assetScripts === "object") {
+                  if (
+                    Object.prototype.hasOwnProperty.call(
+                      assetScripts,
+                      scriptName
+                    )
+                  ) {
+                    const candidateId = candidateAsset.get("id");
+                    const candidateAssetObj = editor.call(
+                      "assets:get",
+                      candidateId
+                    );
+                    if (candidateAssetObj) {
+                      // If multiple assets have the same script name, choose the one with highest ID (newest)
+                      if (candidateId > maxAssetId) {
+                        maxAssetId = candidateId;
+                        foundAsset = candidateAssetObj;
+                        foundAssetId = candidateId;
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                // Skip assets that can't be read
+              }
+            }
+
+            if (foundAsset && foundAssetId) {
+              asset = foundAsset;
+              // Update the map with the new asset ID
+              scriptNameToAssetIdMap.set(scriptName, foundAssetId);
+              assetId = foundAssetId;
+            }
+          }
+
+          if (!asset) {
             console.warn(
-              `[GraphBridge] Could not get asset with ID ${assetId}. Falling back to inferred attribute types.`
+              `[GraphBridge] Could not get asset for script "${scriptName}". Falling back to inferred attribute types.`
             );
           } else {
             // Get the schema (definitions) from the asset data
@@ -616,7 +727,6 @@
         try {
           dispose();
         } catch (err) {
-          // eslint-disable-next-line no-console
           console.warn("[GraphBridge] Failed to dispose entity watcher", err);
         }
       });
@@ -637,8 +747,6 @@
     // The 'editor:ready' event fires when the editor is fully initialized.
     // This is the correct and reliable time to perform our one-time setup.
     editor.once("assets:load", () => {
-      // eslint-disable-next-line no-console
-      console.log("[GraphBridge] Editor is ready. Initializing script map...");
       scriptNameToAssetIdMap = buildScriptNameMap();
 
       const existingEntities = editor.call("entities:list") || [];
@@ -653,6 +761,77 @@
         initializeHierarchyCollapseWatcher();
       });
 
+      // Listen for scripts being added to the registry
+      // Reference: assets-script-registry.ts - this event fires when data.scripts is fully parsed
+      // Event signature: assets:scripts:add(asset, scriptName)
+      // This is more reliable than assets:add because it only fires when the script is actually parsed and added to the registry
+      editor.on("assets:scripts:add", (asset, scriptName) => {
+        try {
+          const assetId = asset.get("id");
+          // Ensure map is initialized
+          if (!scriptNameToAssetIdMap) {
+            scriptNameToAssetIdMap = new Map();
+          }
+          // Update the map with this script
+          scriptNameToAssetIdMap.set(scriptName, assetId);
+
+          // Find all entities that use this script and re-broadcast their data
+          // This ensures that entities that were serialized before the script was parsed
+          // will get updated with the correct schema
+          const allEntities = editor.call("entities:list") || [];
+          allEntities.forEach((entity) => {
+            try {
+              const scriptComponent = entity.get("components.script");
+              if (scriptComponent && scriptComponent.scripts) {
+                // Check if this entity uses the script that was just added
+                if (
+                  Object.prototype.hasOwnProperty.call(
+                    scriptComponent.scripts,
+                    scriptName
+                  )
+                ) {
+                  // Re-serialize and broadcast this entity's update
+                  const serialized = serializeEntityData(entity);
+                  if (serialized) {
+                    postGraphMessage("PC_GRAPH_ENTITY_UPDATED", {
+                      entity: serialized,
+                    });
+                  }
+                }
+              }
+            } catch (error) {
+              // Skip entities that can't be processed
+            }
+          });
+        } catch (error) {
+          console.error(
+            "[GraphBridge] Error handling assets:scripts:add event:",
+            error
+          );
+        }
+      });
+
+      // Listen for scripts being removed from the registry
+      // Reference: assets-script-registry.ts - this event fires when script is removed
+      // Event signature: assets:scripts:remove(asset, scriptName)
+      editor.on("assets:scripts:remove", (asset, scriptName) => {
+        try {
+          const removedAssetId = asset.get("id");
+          // Remove this script from the map if it maps to the removed asset
+          if (scriptNameToAssetIdMap) {
+            const currentAssetId = scriptNameToAssetIdMap.get(scriptName);
+            if (currentAssetId === removedAssetId) {
+              scriptNameToAssetIdMap.delete(scriptName);
+            }
+          }
+        } catch (error) {
+          console.error(
+            "[GraphBridge] Error handling assets:scripts:remove event:",
+            error
+          );
+        }
+      });
+
       editor.on("entities:add", (entity) => {
         try {
           registerEntityWatcher(entity);
@@ -661,7 +840,6 @@
             postGraphMessage("PC_GRAPH_ENTITY_ADDED", { entity: serialized });
           }
         } catch (error) {
-          // eslint-disable-next-line no-console
           console.error("[GraphBridge] Failed to handle entity add", error);
         }
       });
@@ -677,7 +855,6 @@
             postGraphMessage("PC_GRAPH_ENTITY_REMOVED", { guid });
           }
         } catch (error) {
-          // eslint-disable-next-line no-console
           console.error("[GraphBridge] Failed to handle entity removal", error);
         }
       });
@@ -687,7 +864,6 @@
         try {
           broadcastSelectionUpdate();
         } catch (error) {
-          // eslint-disable-next-line no-console
           console.error("[GraphBridge] selector update failed", error);
         }
       });

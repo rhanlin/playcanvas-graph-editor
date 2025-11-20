@@ -113,9 +113,11 @@ window.addEventListener("message", (event: MessageEvent) => {
   }
 
   if (data?.type === "PC_GRAPH_COLLAPSE_STATE") {
-    const collapsePayload = (data as {
-      payload?: { guid?: string; collapsed?: boolean };
-    }).payload;
+    const collapsePayload = (
+      data as {
+        payload?: { guid?: string; collapsed?: boolean };
+      }
+    ).payload;
     if (collapsePayload?.guid) {
       safeSendMessage({
         type: "GRAPH_COLLAPSE_STATE_UPDATE",

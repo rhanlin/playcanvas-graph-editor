@@ -49,6 +49,9 @@ export const ScriptNode = memo(
       >
         <div className="flex items-center justify-between gap-2">
           <div>
+            <p className="text-[11px] uppercase tracking-wide text-pc-text-dark">
+              Script
+            </p>
             <p className="font-bold text-sm text-pc-text-secondary">
               {data.label}
             </p>
