@@ -196,7 +196,7 @@ const AttributeField = ({
             type="source"
             position={Position.Right}
             id={attributeName}
-            className="!absolute !right-1 !top-1/2 !h-3 !w-3 !bg-pc-text-active"
+            className="absolute -right-2 top-1/2 h-3 w-3 bg-pc-text-active"
             style={{ transform: "translateY(-50%)" }}
           />
         ) : null}
@@ -459,7 +459,7 @@ const AttributeInput = ({
                       autoFocus
                       onPointerDownCapture={stopReactFlowEvent}
                       onChange={(event) => setEntityQuery(event.target.value)}
-                      placeholder="Search entities by name"
+                      placeholder="Search entity by name"
                       className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
                     />
                     <div
@@ -515,37 +515,41 @@ const AttributeInput = ({
                 </div>
               ) : null}
             </div>
-            <button
-              type="button"
-              disabled={!currentId}
-              onPointerDownCapture={stopReactFlowEventWithPreventDefault}
-              onMouseUpCapture={stopReactFlowEventWithPreventDefault}
-              onClick={withStopPropagation(() => {
-                if (currentId) {
-                  focusEntity(currentId);
-                }
-              })}
-              className={`rounded-md border px-2 py-1 font-semibold transition ${
-                currentId
-                  ? "border-pc-border-primary/60 text-pc-text-secondary hover:border-pc-text-active hover:text-pc-text-active"
-                  : "cursor-not-allowed border-pc-border-primary/30 text-pc-text-dark"
-              }`}
-            >
-              Focus
-            </button>
-            <button
-              type="button"
-              onPointerDownCapture={stopReactFlowEventWithPreventDefault}
-              onMouseUpCapture={stopReactFlowEventWithPreventDefault}
-              onClick={withStopPropagation(() => {
-                onChange(null);
-                setEntityPickerOpen(false);
-                setEntityQuery("");
-              })}
-              className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover-border-pc-error hover:text-pc-error"
-            >
-              Clear
-            </button>
+            {currentId && (
+              <>
+                <button
+                  type="button"
+                  disabled={!currentId}
+                  onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+                  onMouseUpCapture={stopReactFlowEventWithPreventDefault}
+                  onClick={withStopPropagation(() => {
+                    if (currentId) {
+                      focusEntity(currentId);
+                    }
+                  })}
+                  className={`rounded-md border px-2 py-1 font-semibold transition ${
+                    currentId
+                      ? "border-pc-border-primary/60 text-pc-text-secondary hover:border-pc-text-active hover:text-pc-text-active"
+                      : "cursor-not-allowed border-pc-border-primary/30 text-pc-text-dark"
+                  }`}
+                >
+                  Focus
+                </button>
+                <button
+                  type="button"
+                  onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+                  onMouseUpCapture={stopReactFlowEventWithPreventDefault}
+                  onClick={withStopPropagation(() => {
+                    onChange(null);
+                    setEntityPickerOpen(false);
+                    setEntityQuery("");
+                  })}
+                  className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover-border-pc-error hover:text-pc-error"
+                >
+                  Clear
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
