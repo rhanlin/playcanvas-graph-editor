@@ -11,7 +11,11 @@ import type { WheelEvent } from "react";
 import { Handle, Position } from "reactflow";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
-import { stopReactFlowEvent, withStopPropagation } from "@/utils/events";
+import {
+  stopReactFlowEvent,
+  stopReactFlowEventWithPreventDefault,
+  withStopPropagation,
+} from "@/utils/events";
 import type {
   EntityPayload,
   ScriptAttributeDefinition,
@@ -430,8 +434,8 @@ const AttributeInput = ({
               <button
                 type="button"
                 ref={searchButtonRef}
-                onPointerDownCapture={stopReactFlowEvent}
-                onMouseUpCapture={stopReactFlowEvent}
+                onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+                onMouseUpCapture={stopReactFlowEventWithPreventDefault}
                 onClick={withStopPropagation(() =>
                   setEntityPickerOpen((open) => !open)
                 )}
@@ -473,8 +477,12 @@ const AttributeInput = ({
                             <button
                               type="button"
                               key={candidate.guid}
-                              onPointerDownCapture={stopReactFlowEvent}
-                              onMouseUpCapture={stopReactFlowEvent}
+                              onPointerDownCapture={
+                                stopReactFlowEventWithPreventDefault
+                              }
+                              onMouseUpCapture={
+                                stopReactFlowEventWithPreventDefault
+                              }
                               onClick={withStopPropagation(() => {
                                 onChange(candidate.guid);
                                 setEntityPickerOpen(false);
@@ -510,8 +518,8 @@ const AttributeInput = ({
             <button
               type="button"
               disabled={!currentId}
-              onPointerDownCapture={stopReactFlowEvent}
-              onMouseUpCapture={stopReactFlowEvent}
+              onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+              onMouseUpCapture={stopReactFlowEventWithPreventDefault}
               onClick={withStopPropagation(() => {
                 if (currentId) {
                   focusEntity(currentId);
@@ -527,14 +535,14 @@ const AttributeInput = ({
             </button>
             <button
               type="button"
-              onPointerDownCapture={stopReactFlowEvent}
-              onMouseUpCapture={stopReactFlowEvent}
+              onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+              onMouseUpCapture={stopReactFlowEventWithPreventDefault}
               onClick={withStopPropagation(() => {
                 onChange(null);
                 setEntityPickerOpen(false);
                 setEntityQuery("");
               })}
-              className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
+              className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover-border-pc-error hover:text-pc-error"
             >
               Clear
             </button>
@@ -724,8 +732,8 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
           />
           <button
             type="button"
-            onPointerDownCapture={stopReactFlowEvent}
-              onMouseUpCapture={stopReactFlowEvent}
+            onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+            onMouseUpCapture={stopReactFlowEventWithPreventDefault}
             onClick={withStopPropagation(() => removeItem(index))}
             className="rounded-lg border border-pc-border-primary/60 px-2 py-1 text-xs text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
           >
@@ -735,8 +743,8 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
       ))}
       <button
         type="button"
-        onPointerDownCapture={stopReactFlowEvent}
-        onMouseUpCapture={stopReactFlowEvent}
+        onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+        onMouseUpCapture={stopReactFlowEventWithPreventDefault}
         onClick={withStopPropagation(addItem)}
         className="w-full rounded-lg border border-dashed border-pc-border-primary/60 px-3 py-2 text-sm text-pc-text-secondary hover:border-pc-text-active"
       >
