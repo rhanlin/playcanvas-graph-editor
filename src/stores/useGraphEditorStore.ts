@@ -447,19 +447,15 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
 
     const newScriptNodeId = scriptNodeId ?? null;
 
-    // Check if state is already correct (to avoid unnecessary updates)
     const stateAlreadyCorrect =
       selectedEntityGuid === guid && selectedScriptNodeId === newScriptNodeId;
 
-    // Only update nodes if state is not already correct
-    // (onNodesChange may have already set the correct state)
     if (!stateAlreadyCorrect) {
       set({
         selectedEntityGuid: guid,
         selectedScriptNodeId: newScriptNodeId,
         selectedEntityName: name ?? (entityNode ? entityNode.data.label : null),
         nodes: nodes.map((node) => {
-          // If a script node is selected, highlight both the script and its parent entity
           if (scriptNodeId) {
             return {
               ...node,
@@ -468,7 +464,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
                 (node.id === scriptNodeId && node.type === "script"),
             };
           }
-          // Otherwise, only highlight the entity
           return {
             ...node,
             selected: node.id === guid && node.type === "entity",
@@ -476,22 +471,18 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         }),
       });
     } else {
-      // Just update the name if it's different
       const newName = name ?? (entityNode ? entityNode.data.label : null);
       if (state.selectedEntityName !== newName) {
         set({ selectedEntityName: newName });
       }
     }
 
-    // Always notify the editor if the selection was made from the extension UI
-    // (onNodesChange may have already notified, but we do it again as a backup)
     if (guid) {
       sendRuntimeMessage({
         type: "GRAPH_SET_SELECTION",
         payload: { entityGuid: guid },
-      }).catch((err) => {
-        // Silently ignore errors when content script is not ready
-        // This can happen during initialization
+      }).catch(() => {
+        // Ignore communication errors
       });
     }
   },

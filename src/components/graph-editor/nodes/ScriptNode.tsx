@@ -1,5 +1,5 @@
-import { memo } from "react";
-import { Handle, Position, type NodeProps } from "reactflow";
+import { memo, useMemo } from "react";
+import type { NodeProps } from "reactflow";
 
 import { ScriptAttributesPanel } from "@/components/script-attributes/ScriptAttributesPanel";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
@@ -14,18 +14,22 @@ type ScriptNodeData = {
 
 export const ScriptNode = memo(
   ({ data, selected }: NodeProps<ScriptNodeData>) => {
-    const clearScriptAttribute = useGraphEditorStore(
-      (state) => state.clearScriptAttribute
-    );
-
-    const entityAttributes = Object.entries(data.attributes || {}).filter(
-      ([, attr]) => attr?.type === "entity"
-    );
-
     const scriptName = data.scriptName || data.label;
     const entityGuid = data.entityGuid;
     const scriptNodeId =
       entityGuid && scriptName ? `${entityGuid}-${scriptName}` : undefined;
+
+    const attributes = data.attributes || {};
+    const entityAttributeCount = useMemo(
+      () =>
+        Object.values(attributes).filter((attr) => attr?.type === "entity")
+          .length,
+      [attributes]
+    );
+    const totalAttributeCount = useMemo(
+      () => Object.keys(attributes).length,
+      [attributes]
+    );
 
     const isCollapsed = useGraphEditorStore((state) =>
       scriptNodeId ? !!state.scriptPanelState[scriptNodeId] : false
@@ -48,9 +52,10 @@ export const ScriptNode = memo(
               {data.label}
             </p>
             <p className="text-xs text-pc-text-dark">
-              {entityAttributes.length} entity handle
-              {entityAttributes.length === 1 ? "" : "s"} •{" "}
-              {Object.keys(data.attributes || {}).length} attributes
+              {entityAttributeCount} entity link
+              {entityAttributeCount === 1 ? "" : "s"} • {totalAttributeCount}{" "}
+              attribute
+              {totalAttributeCount === 1 ? "" : "s"}
             </p>
           </div>
           {scriptNodeId ? (
@@ -65,52 +70,6 @@ export const ScriptNode = memo(
               {isCollapsed ? "Expand" : "Collapse"}
             </button>
           ) : null}
-        </div>
-        <div className="mt-3 flex flex-col gap-2">
-          {entityAttributes.length > 0 ? (
-            entityAttributes.map(([key, attrData]) => {
-              const attr = attrData;
-              const isLinked = !!attr?.value;
-              return (
-                <div
-                  key={key}
-                  className="relative flex items-center justify-between pr-6"
-                >
-                  <span className="text-sm text-pc-text-secondary">{key}</span>
-                  {isLinked ? (
-                    <button
-                      type="button"
-                      className="ml-2 inline-flex h-6 items-center justify-center rounded-md border border-pc-border-primary/40 px-2 text-xs font-bold text-pc-error-secondary hover:border-pc-error-secondary hover:text-pc-error"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (!entityGuid || !scriptName) {
-                          return;
-                        }
-                        clearScriptAttribute(entityGuid, scriptName, key);
-                      }}
-                    >
-                      ×
-                    </button>
-                  ) : (
-                    <span className="text-[10px] uppercase tracking-wide text-pc-text-darkest">
-                      Unlinked
-                    </span>
-                  )}
-                  <Handle
-                    type="source"
-                    position={Position.Right}
-                    id={key}
-                    className="!absolute !right-0 !h-2.5 !w-2.5 !bg-pc-text-active"
-                    style={{ top: "50%", transform: "translateY(-50%)" }}
-                  />
-                </div>
-              );
-            })
-          ) : (
-            <div className="text-xs italic text-pc-text-secondary">
-              No entity attributes
-            </div>
-          )}
         </div>
         {!isCollapsed && entityGuid && scriptName ? (
           <div className="mt-3 rounded-2xl border border-pc-border-primary/40 bg-pc-primary/50 p-3">

@@ -1,4 +1,14 @@
-import { memo, useMemo, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { SyntheticEvent, WheelEvent } from "react";
+import { Handle, Position } from "reactflow";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import type {
@@ -162,8 +172,8 @@ const AttributeField = ({
   };
 
   return (
-    <div className="rounded-2xl border border-pc-border-primary/50 bg-pc-dark p-3 text-sm text-pc-text-primary">
-      <div className="flex items-center justify-between gap-2">
+    <div className=" rounded-2xl border border-pc-border-primary/50 bg-pc-dark p-3 text-sm text-pc-text-primary">
+      <div className="relative flex items-center justify-between gap-2">
         <div>
           <p className="font-semibold">{label}</p>
           {description ? (
@@ -175,6 +185,16 @@ const AttributeField = ({
             {definition.placeholder}
           </span>
         ) : null}
+
+        {definition?.type === "entity" ? (
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={attributeName}
+            className="!absolute !right-1 !top-1/2 !h-3 !w-3 !bg-pc-text-active"
+            style={{ transform: "translateY(-50%)" }}
+          />
+        ) : null}
       </div>
       <div className="mt-3">
         <AttributeInput
@@ -183,6 +203,8 @@ const AttributeField = ({
           value={attribute.value}
           onChange={handleChange}
           entities={entities}
+          entityGuid={entityGuid}
+          attributeKey={attributeName}
         />
       </div>
     </div>
@@ -195,6 +217,8 @@ type AttributeInputProps = {
   definition?: ScriptAttributeDefinition;
   onChange: (value: unknown) => void;
   entities: Record<string, EntityPayload>;
+  entityGuid: string;
+  attributeKey: string;
 };
 
 const AttributeInput = ({
@@ -203,8 +227,132 @@ const AttributeInput = ({
   definition,
   onChange,
   entities,
+  entityGuid,
+  attributeKey,
 }: AttributeInputProps) => {
   const type = attribute.type || definition?.type || "string";
+  const [isEntityPickerOpen, setEntityPickerOpen] = useState(false);
+  const [entityQuery, setEntityQuery] = useState("");
+  const pickerAnchorRef = useRef<HTMLDivElement | null>(null);
+  const pickerPanelRef = useRef<HTMLDivElement | null>(null);
+  const searchButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [popupPlacement, setPopupPlacement] = useState<
+    "right" | "left" | "bottom"
+  >("bottom");
+  const stopPropagation = useCallback((event: SyntheticEvent) => {
+    event.stopPropagation();
+  }, []);
+  const stopWheelPropagation = useCallback(
+    (event: WheelEvent<HTMLDivElement>) => {
+      event.stopPropagation();
+      if (typeof event.nativeEvent.stopImmediatePropagation === "function") {
+        event.nativeEvent.stopImmediatePropagation();
+      }
+    },
+    []
+  );
+  const entityMatches = useMemo(() => {
+    if (type !== "entity") {
+      return [];
+    }
+    const normalizedQuery = entityQuery.trim().toLowerCase();
+    return Object.values(entities)
+      .filter((candidate) => candidate.guid !== entityGuid)
+      .filter((candidate) => {
+        if (!normalizedQuery) {
+          return true;
+        }
+        const name = (candidate.name || "").toLowerCase();
+        return (
+          name.includes(normalizedQuery) ||
+          candidate.guid.toLowerCase().includes(normalizedQuery)
+        );
+      })
+      .slice(0, 10);
+  }, [type, entityQuery, entities, entityGuid]);
+
+  useEffect(() => {
+    if (type !== "entity" || !isEntityPickerOpen) {
+      return;
+    }
+
+    const closePicker = () => {
+      setEntityPickerOpen(false);
+      setEntityQuery("");
+    };
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      const clickedInsidePopup =
+        !!pickerPanelRef.current &&
+        pickerPanelRef.current.contains(target as Node);
+      const clickedAnchor =
+        !!pickerAnchorRef.current &&
+        pickerAnchorRef.current.contains(target as Node);
+      if (!clickedInsidePopup && !clickedAnchor) {
+        closePicker();
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closePicker();
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [type, isEntityPickerOpen]);
+
+  useLayoutEffect(() => {
+    if (type !== "entity" || !isEntityPickerOpen) {
+      return;
+    }
+
+    const POPUP_WIDTH = 288;
+    const POPUP_MARGIN = 16;
+
+    const updatePlacement = () => {
+      const button = searchButtonRef.current;
+      if (!button) {
+        setPopupPlacement("bottom");
+        return;
+      }
+
+      const rect = button.getBoundingClientRect();
+      const availableRight = window.innerWidth - rect.right;
+      const availableLeft = rect.left;
+
+      if (availableRight >= POPUP_WIDTH + POPUP_MARGIN) {
+        setPopupPlacement("right");
+      } else if (availableLeft >= POPUP_WIDTH + POPUP_MARGIN) {
+        setPopupPlacement("left");
+      } else {
+        setPopupPlacement("bottom");
+      }
+    };
+
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    return () => {
+      window.removeEventListener("resize", updatePlacement);
+    };
+  }, [type, isEntityPickerOpen]);
+
+  const popupPlacementClass = useMemo(() => {
+    switch (popupPlacement) {
+      case "right":
+        return "left-full top-0 ml-3";
+      case "left":
+        return "right-full top-0 mr-3";
+      default:
+        return "left-1/2 top-full mt-2 -translate-x-1/2";
+    }
+  }, [popupPlacement]);
 
   if (type === "boolean") {
     return (
@@ -262,24 +410,110 @@ const AttributeInput = ({
   }
 
   if (type === "entity") {
-    const entityName = value && entities[String(value)]?.name;
+    const currentId = value ? String(value) : "";
+    const currentEntity = currentId ? entities[currentId] : undefined;
+
     return (
-      <div className="flex items-center justify-between rounded-xl border border-dashed border-pc-border-primary/60 bg-pc-dark/60 px-3 py-2 text-xs">
-        <div>
-          <p className="font-semibold text-pc-text-secondary">
-            {value ? entityName || value : "No entity linked"}
-          </p>
-          <p className="text-pc-text-dark">
-            Use graph handles to connect or the button to clear.
-          </p>
+      <div className="rounded-xl border border-dashed border-pc-border-primary/60 bg-pc-dark/60 px-3 py-3 text-xs">
+        <div className="flex flex-col gap-2 justify-between">
+          <div>
+            <p className="text-sm font-semibold text-pc-text-secondary">
+              {currentId
+                ? "Linked to: " + (currentEntity?.name || currentId)
+                : "No entity linked"}
+            </p>
+            <p className="text-pc-text-dark">
+              Drag from the connector or search to pick a target entity.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <div className="relative inline-flex" ref={pickerAnchorRef}>
+              <button
+                type="button"
+                ref={searchButtonRef}
+                onClick={() => setEntityPickerOpen((open) => !open)}
+                className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover:border-pc-text-active hover:text-pc-text-active"
+              >
+                {isEntityPickerOpen ? "Close" : "Search"}
+              </button>
+              {isEntityPickerOpen ? (
+                <div
+                  ref={pickerPanelRef}
+                  className={`nodrag absolute z-40 w-72 rounded-2xl border border-pc-border-primary/70 bg-pc-darkest/95 p-3 shadow-2xl backdrop-blur ${popupPlacementClass}`}
+                  onPointerDown={stopPropagation}
+                  onMouseDown={stopPropagation}
+                  onWheel={stopWheelPropagation}
+                  onWheelCapture={stopWheelPropagation}
+                >
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={entityQuery}
+                      autoFocus
+                      onChange={(event) => setEntityQuery(event.target.value)}
+                      placeholder="Search entities by name"
+                      className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
+                    />
+                    <div
+                      className="max-h-60 overflow-y-scroll overscroll-contain rounded-xl border border-pc-border-primary/30"
+                      onMouseDown={stopPropagation}
+                      onWheel={stopWheelPropagation}
+                      onWheelCapture={stopWheelPropagation}
+                    >
+                      {entityMatches.length ? (
+                        entityMatches.map((candidate) => {
+                          const isActive = candidate.guid === currentId;
+                          const displayName =
+                            candidate.name || "(Unnamed entity)";
+                          return (
+                            <button
+                              type="button"
+                              key={candidate.guid}
+                              onClick={() => {
+                                onChange(candidate.guid);
+                                setEntityPickerOpen(false);
+                                setEntityQuery("");
+                              }}
+                              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition ${
+                                isActive
+                                  ? "bg-pc-text-active/10 text-pc-text-primary font-semibold"
+                                  : "text-pc-text-primary hover:bg-pc-dark"
+                              }`}
+                            >
+                              <span className="truncate pr-2">
+                                {displayName}
+                              </span>
+                              {isActive ? (
+                                <span className="text-[10px] uppercase text-pc-text-active">
+                                  Linked
+                                </span>
+                              ) : null}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <p className="py-4 text-center text-xs text-pc-text-dark">
+                          No entities found.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                onChange(null);
+                setEntityPickerOpen(false);
+                setEntityQuery("");
+              }}
+              className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
+            >
+              Clear
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="rounded-md border border-pc-border-primary/60 px-2 py-1 text-xs font-semibold text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
-        >
-          Clear
-        </button>
       </div>
     );
   }
