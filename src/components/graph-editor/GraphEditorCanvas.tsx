@@ -120,12 +120,6 @@ export function GraphEditorCanvas() {
         setReparentPreview(draggingGuid, null);
       }
 
-      // Debug log for drag start
-      console.log("[Reparent Debug] Dragging entity:", {
-        guid: draggingGuid,
-        label: node.data?.label,
-      });
-
       // Use DOM API to find the node under cursor (works correctly for nested nodes)
       // Temporarily hide the dragging node to detect nodes underneath
       const draggingNodeElement = document.querySelector(
@@ -174,10 +168,6 @@ export function GraphEditorCanvas() {
             );
             if (foundNode) {
               hoverTarget = foundNode;
-              console.log("[Reparent Debug] Hover target detected:", {
-                guid: foundNode.id,
-                label: foundNode.data?.label,
-              });
             }
           }
         }
@@ -214,26 +204,11 @@ export function GraphEditorCanvas() {
 
           if (isSelf || isDescendant) {
             // Invalid target, clear preview
-            console.log(
-              "[Reparent Debug] Invalid target (self or descendant):",
-              {
-                draggingGuid,
-                targetGuid,
-              }
-            );
             setReparentPreview(draggingGuid, null);
             return;
           }
 
           // Valid entity target, set preview after delay
-          console.log(
-            "[Reparent Debug] Valid target detected, scheduling preview:",
-            {
-              draggingGuid,
-              targetGuid,
-              isAncestor,
-            }
-          );
           previewTimeoutRef.current = setTimeout(() => {
             setReparentPreview(draggingGuid, targetGuid);
           }, PREVIEW_DELAY_MS);
@@ -246,13 +221,9 @@ export function GraphEditorCanvas() {
 
           if (isAlreadyAtRoot) {
             // Already at root, no need to preview
-            console.log("[Reparent Debug] Hovering blank but already at root");
             setReparentPreview(draggingGuid, null);
           } else {
             // Set preview for root reparent after delay
-            console.log(
-              "[Reparent Debug] Hovering blank, scheduling root preview"
-            );
             previewTimeoutRef.current = setTimeout(() => {
               setReparentPreview(draggingGuid, "ROOT");
             }, PREVIEW_DELAY_MS);
@@ -286,21 +257,11 @@ export function GraphEditorCanvas() {
         previewTimeoutRef.current = null;
       }
       lastHoverTargetRef.current = null;
-
-      console.log("[Reparent Debug] Drag stop:", {
-        draggingGuid,
-        previewParentGuid,
-      });
-
       // Execute reparent if preview was active
       if (previewParentGuid && previewParentGuid !== draggingGuid) {
         // Convert "ROOT" marker to null for actual reparent
         const actualParentGuid =
           previewParentGuid === "ROOT" ? null : previewParentGuid;
-        console.log("[Reparent Debug] Executing reparent:", {
-          child: draggingGuid,
-          newParent: actualParentGuid ?? "ROOT",
-        });
         reparentEntity(draggingGuid, actualParentGuid);
       } else {
         // Clear preview state
