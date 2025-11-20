@@ -121,33 +121,33 @@ export default function App() {
   ]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">
-      <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+    <div className="flex min-h-screen flex-col bg-pc-darkest text-pc-text-primary">
+      <header className="flex items-center justify-between border-b border-pc-border-primary/40 px-6 py-4">
         <div>
-          <p className="text-lg font-semibold">PlayCanvas Visual Editor</p>
-          <p className="text-sm text-slate-400">
+          <p className="text-lg font-bold">PlayCanvas Visual Editor</p>
+          <p className="text-sm text-pc-text-secondary">
             {selectedEntityName
               ? `Focused on: ${selectedEntityName}`
               : "Select an entity in the editor to see its name here"}
           </p>
         </div>
         <button
-          className="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-semibold text-white"
+          className="rounded-lg bg-pc-dark px-4 py-2 text-sm font-bold text-pc-text-primary hover:bg-pc-darker transition-colors"
           onClick={requestGraphData}
         >
           Refresh
         </button>
       </header>
-      <main className="relative flex flex-1 min-h-0 bg-slate-900">
+      <main className="relative flex flex-1 min-h-0 bg-pc-darker">
         {isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
-            <span className="text-sm uppercase tracking-[0.4em] text-slate-200">
+          <div className="absolute inset-0 flex items-center justify-center bg-pc-darkest/80">
+            <span className="text-sm uppercase tracking-[0.4em] text-pc-text-secondary">
               Loading
             </span>
           </div>
         )}
         {error && (
-          <div className="z-50 absolute right-4 top-4 rounded-lg bg-rose-500/90 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+          <div className="z-50 absolute right-4 top-4 rounded-lg bg-pc-error/90 px-4 py-2 text-xs font-bold text-pc-text-primary shadow-lg">
             {error}
           </div>
         )}

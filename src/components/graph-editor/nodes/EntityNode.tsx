@@ -29,31 +29,31 @@ export const EntityNode = memo(
 
     return (
       <div
-        className={`relative h-full w-full rounded-3xl border border-white/15 bg-slate-900/80 p-4 text-white shadow-xl shadow-black/40 transition-all ${
+        className={`relative h-full w-full rounded-3xl border border-pc-border-primary/60 bg-pc-primary/80 p-4 text-pc-text-primary shadow-xl shadow-black/40 transition-all ${
           collapsed ? "opacity-90" : ""
         } ${
           isDragging ? "opacity-50 cursor-grabbing" : ""
         } ${
           // Preview effects take priority over selection
           isReparentingToRoot
-            ? "!ring-4 !ring-blue-400 !ring-offset-2 !ring-offset-slate-900 !bg-blue-900/20 !border-blue-400/50"
+            ? "!ring-4 !ring-pc-text-active !ring-offset-2 !ring-offset-pc-darkest !bg-pc-darkest/20 !border-pc-text-active/50"
             : isPreviewTarget
-            ? "!ring-4 !ring-emerald-400 !ring-offset-2 !ring-offset-slate-900 !bg-emerald-900/20 !border-emerald-400/50"
+            ? "!ring-4 !ring-pc-text-active !ring-offset-2 !ring-offset-pc-darkest !bg-pc-darkest/20 !border-pc-text-active/50"
             : selected
-            ? "ring-2 ring-yellow-400 ring-offset-2 ring-offset-slate-900"
+            ? "ring-2 ring-pc-text-active ring-offset-2 ring-offset-pc-darkest"
             : ""
         }`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-[11px] uppercase tracking-wide text-white/60">
+            <p className="text-[11px] uppercase tracking-wide text-pc-text-dark">
               Entity
             </p>
-            <div className="text-lg font-semibold leading-tight">
+            <div className="text-lg font-bold leading-tight">
               {data.label}
             </div>
             {childrenCount > 0 && (
-              <p className="text-xs text-white/60">
+              <p className="text-xs text-pc-text-dark">
                 {childrenCount} child{childrenCount === 1 ? "" : "ren"}
               </p>
             )}
@@ -65,7 +65,7 @@ export const EntityNode = memo(
               toggleEntityCollapse(id);
             }}
             onMouseDown={(event) => event.stopPropagation()}
-            className="rounded-full border border-white/20 bg-white/10 p-1 text-white transition hover:bg-white/20"
+            className="rounded-full border border-pc-border-primary/80 bg-pc-dark p-1 text-pc-text-primary transition hover:bg-pc-darker"
             aria-label={collapsed ? "Expand entity" : "Collapse entity"}
           >
             <span
@@ -80,7 +80,7 @@ export const EntityNode = memo(
         <Handle
           type="target"
           position={Position.Left}
-          className="!h-3 !w-3 !bg-white/70"
+          className="!h-3 !w-3 !bg-pc-text-secondary"
         />
       </div>
     );

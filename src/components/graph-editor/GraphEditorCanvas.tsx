@@ -115,12 +115,12 @@ export function GraphEditorCanvas() {
         if (nodeElement) {
           // Try data-id first (React Flow v11+)
           let nodeId = nodeElement.getAttribute("data-id");
-          
+
           // Fallback: try data-id from data attributes
           if (!nodeId) {
             nodeId = nodeElement.getAttribute("data-nodeid");
           }
-          
+
           // Fallback: extract from id attribute (format: "react-flow__node-{id}")
           if (!nodeId) {
             const idAttr = nodeElement.getAttribute("id");
@@ -132,7 +132,8 @@ export function GraphEditorCanvas() {
           if (nodeId && nodeId !== draggingGuid) {
             const allNodes = reactFlowInstance.getNodes();
             const foundNode = allNodes.find(
-              (n) => n.id === nodeId && n.type === "entity" && n.id !== draggingGuid
+              (n) =>
+                n.id === nodeId && n.type === "entity" && n.id !== draggingGuid
             );
             if (foundNode) {
               hoverTarget = foundNode;
@@ -198,7 +199,13 @@ export function GraphEditorCanvas() {
         }
       }
     },
-    [reactFlowInstance, setReparentPreview, checkIsDescendant, entities, rootGuid]
+    [
+      reactFlowInstance,
+      setReparentPreview,
+      checkIsDescendant,
+      entities,
+      rootGuid,
+    ]
   );
 
   const onNodeDragStop = useCallback(
@@ -254,11 +261,7 @@ export function GraphEditorCanvas() {
               attributeName?: string;
             }
           | undefined;
-        if (
-          data?.entityGuid &&
-          data?.scriptName &&
-          data?.attributeName
-        ) {
+        if (data?.entityGuid && data?.scriptName && data?.attributeName) {
           clearScriptAttribute(
             data.entityGuid,
             data.scriptName,
@@ -288,7 +291,7 @@ export function GraphEditorCanvas() {
       onNodeClick={onNodeClick}
       onNodeDrag={onNodeDrag}
       onNodeDragStop={onNodeDragStop}
-      className="h-full bg-slate-900"
+      className="h-full bg-pc-darker"
       connectionRadius={40}
       fitView
     >
