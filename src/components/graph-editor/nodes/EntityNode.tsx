@@ -2,6 +2,7 @@ import { memo } from "react";
 import { Handle, Position, type NodeProps } from "reactflow";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
+import { stopReactFlowEvent, withStopPropagation } from "@/utils/events";
 
 interface EntityNodeData {
   label: string;
@@ -60,11 +61,10 @@ export const EntityNode = memo(
           </div>
           <button
             type="button"
-            onClick={(event) => {
-              event.stopPropagation();
+            onPointerDownCapture={stopReactFlowEvent}
+            onClick={withStopPropagation(() => {
               toggleEntityCollapse(id);
-            }}
-            onMouseDown={(event) => event.stopPropagation()}
+            })}
             className="rounded-full border border-pc-border-primary/80 bg-pc-dark p-1 text-pc-text-primary transition hover:bg-pc-darker"
             aria-label={collapsed ? "Expand entity" : "Collapse entity"}
           >

@@ -7,10 +7,11 @@ import {
   useRef,
   useState,
 } from "react";
-import type { SyntheticEvent, WheelEvent } from "react";
+import type { WheelEvent } from "react";
 import { Handle, Position } from "reactflow";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
+import { stopReactFlowEvent, withStopPropagation } from "@/utils/events";
 import type {
   EntityPayload,
   ScriptAttributeDefinition,
@@ -239,15 +240,9 @@ const AttributeInput = ({
   const [popupPlacement, setPopupPlacement] = useState<
     "right" | "left" | "bottom"
   >("bottom");
-  const stopPropagation = useCallback((event: SyntheticEvent) => {
-    event.stopPropagation();
-  }, []);
   const stopWheelPropagation = useCallback(
     (event: WheelEvent<HTMLDivElement>) => {
-      event.stopPropagation();
-      if (typeof event.nativeEvent.stopImmediatePropagation === "function") {
-        event.nativeEvent.stopImmediatePropagation();
-      }
+      stopReactFlowEvent(event);
     },
     []
   );
@@ -360,6 +355,7 @@ const AttributeInput = ({
         <input
           type="checkbox"
           checked={!!value}
+          onPointerDownCapture={stopReactFlowEvent}
           onChange={(event) => onChange(event.target.checked)}
           className="h-4 w-4 accent-pc-text-active"
         />
@@ -383,6 +379,7 @@ const AttributeInput = ({
             max={definition?.max}
             step={definition?.step || 1}
             value={typeof value === "number" ? value : definition?.min || 0}
+            onPointerDownCapture={stopReactFlowEvent}
             onChange={(event) => onChange(Number(event.target.value))}
             className="w-full"
           />
@@ -390,6 +387,7 @@ const AttributeInput = ({
         <input
           type="number"
           value={value ?? ""}
+          onPointerDownCapture={stopReactFlowEvent}
           onChange={(event) => onChange(Number(event.target.value))}
           className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
         />
@@ -431,7 +429,10 @@ const AttributeInput = ({
               <button
                 type="button"
                 ref={searchButtonRef}
-                onClick={() => setEntityPickerOpen((open) => !open)}
+                onPointerDownCapture={stopReactFlowEvent}
+                onClick={withStopPropagation(() =>
+                  setEntityPickerOpen((open) => !open)
+                )}
                 className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover:border-pc-text-active hover:text-pc-text-active"
               >
                 {isEntityPickerOpen ? "Close" : "Search"}
@@ -440,8 +441,8 @@ const AttributeInput = ({
                 <div
                   ref={pickerPanelRef}
                   className={`nodrag absolute z-40 w-72 rounded-2xl border border-pc-border-primary/70 bg-pc-darkest/95 p-3 shadow-2xl backdrop-blur ${popupPlacementClass}`}
-                  onPointerDown={stopPropagation}
-                  onMouseDown={stopPropagation}
+                  onPointerDownCapture={stopReactFlowEvent}
+                  onMouseDown={stopReactFlowEvent}
                   onWheel={stopWheelPropagation}
                   onWheelCapture={stopWheelPropagation}
                 >
@@ -450,13 +451,14 @@ const AttributeInput = ({
                       type="text"
                       value={entityQuery}
                       autoFocus
+                      onPointerDownCapture={stopReactFlowEvent}
                       onChange={(event) => setEntityQuery(event.target.value)}
                       placeholder="Search entities by name"
                       className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
                     />
                     <div
                       className="max-h-60 overflow-y-scroll overscroll-contain rounded-xl border border-pc-border-primary/30"
-                      onMouseDown={stopPropagation}
+                      onMouseDown={stopReactFlowEvent}
                       onWheel={stopWheelPropagation}
                       onWheelCapture={stopWheelPropagation}
                     >
@@ -469,11 +471,12 @@ const AttributeInput = ({
                             <button
                               type="button"
                               key={candidate.guid}
-                              onClick={() => {
+                              onPointerDownCapture={stopReactFlowEvent}
+                              onClick={withStopPropagation(() => {
                                 onChange(candidate.guid);
                                 setEntityPickerOpen(false);
                                 setEntityQuery("");
-                              }}
+                              })}
                               className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition ${
                                 isActive
                                   ? "bg-pc-text-active/10 text-pc-text-primary font-semibold"
@@ -503,11 +506,12 @@ const AttributeInput = ({
             </div>
             <button
               type="button"
-              onClick={() => {
+              onPointerDownCapture={stopReactFlowEvent}
+              onClick={withStopPropagation(() => {
                 onChange(null);
                 setEntityPickerOpen(false);
                 setEntityQuery("");
-              }}
+              })}
               className="rounded-md border border-pc-border-primary/60 px-2 py-1 font-semibold text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
             >
               Clear
@@ -523,6 +527,7 @@ const AttributeInput = ({
     return (
       <select
         value={value ?? ""}
+        onPointerDownCapture={stopReactFlowEvent}
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
       >
@@ -544,6 +549,7 @@ const AttributeInput = ({
     return (
       <textarea
         value={JSON.stringify(value ?? {}, null, 2)}
+        onPointerDownCapture={stopReactFlowEvent}
         onChange={(event) => {
           try {
             const parsed = JSON.parse(event.target.value);
@@ -563,6 +569,7 @@ const AttributeInput = ({
       type="text"
       value={value ?? ""}
       placeholder={definition?.placeholder}
+      onPointerDownCapture={stopReactFlowEvent}
       onChange={(event) => onChange(event.target.value)}
       className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
     />
@@ -606,6 +613,7 @@ const VectorField = ({
           <input
             type="checkbox"
             checked={lockAxes}
+            onPointerDownCapture={stopReactFlowEvent}
             onChange={(event) => setLockAxes(event.target.checked)}
             className="h-3 w-3 accent-pc-text-active"
           />
@@ -632,6 +640,7 @@ const VectorField = ({
                   max={max}
                   step={step}
                   value={value?.[index] ?? min}
+                  onPointerDownCapture={stopReactFlowEvent}
                   onChange={(event) =>
                     handleAxisChange(index, Number(event.target.value))
                   }
@@ -642,6 +651,7 @@ const VectorField = ({
                 type="number"
                 value={value?.[index] ?? 0}
                 step={step}
+                onPointerDownCapture={stopReactFlowEvent}
                 onChange={(event) =>
                   handleAxisChange(index, Number(event.target.value))
                 }
@@ -686,12 +696,14 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
           <input
             type="text"
             value={String(entry ?? "")}
+            onPointerDownCapture={stopReactFlowEvent}
             onChange={(event) => handleItemChange(index, event.target.value)}
             className="flex-1 rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
           />
           <button
             type="button"
-            onClick={() => removeItem(index)}
+            onPointerDownCapture={stopReactFlowEvent}
+            onClick={withStopPropagation(() => removeItem(index))}
             className="rounded-lg border border-pc-border-primary/60 px-2 py-1 text-xs text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
           >
             Remove
@@ -700,7 +712,8 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
       ))}
       <button
         type="button"
-        onClick={addItem}
+        onPointerDownCapture={stopReactFlowEvent}
+        onClick={withStopPropagation(addItem)}
         className="w-full rounded-lg border border-dashed border-pc-border-primary/60 px-3 py-2 text-sm text-pc-text-secondary hover:border-pc-text-active"
       >
         + Add Item

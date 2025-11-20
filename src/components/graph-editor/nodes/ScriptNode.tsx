@@ -4,6 +4,7 @@ import type { NodeProps } from "reactflow";
 import { ScriptAttributesPanel } from "@/components/script-attributes/ScriptAttributesPanel";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import type { ScriptAttributePayload } from "@/types/messaging";
+import { stopReactFlowEvent, withStopPropagation } from "@/utils/events";
 
 type ScriptNodeData = {
   label: string;
@@ -61,10 +62,10 @@ export const ScriptNode = memo(
           {scriptNodeId ? (
             <button
               type="button"
-              onClick={(event) => {
-                event.stopPropagation();
+              onPointerDownCapture={stopReactFlowEvent}
+              onClick={withStopPropagation(() => {
                 toggleScriptPanel(scriptNodeId);
-              }}
+              })}
               className="rounded-full border border-pc-border-primary/60 bg-pc-darkest px-3 py-1 text-xs font-semibold text-pc-text-secondary transition hover:border-pc-text-active hover:text-pc-text-active"
             >
               {isCollapsed ? "Expand" : "Collapse"}
