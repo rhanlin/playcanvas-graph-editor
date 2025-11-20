@@ -12,7 +12,7 @@
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "jsx": "react-jsx",
-    "types": ["chrome"],
+    "types": ["chrome", "node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
