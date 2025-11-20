@@ -6,6 +6,7 @@ type NativeEventLike = {
 
 export const stopReactFlowEvent = (event: SyntheticEvent) => {
   event.stopPropagation();
+  event.preventDefault();
   const native = event.nativeEvent as NativeEventLike | undefined;
   if (native?.stopImmediatePropagation) {
     native.stopImmediatePropagation();

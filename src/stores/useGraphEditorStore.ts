@@ -35,6 +35,7 @@ interface GraphEditorState {
   selectedEntityName: string | null;
   draggingEntityGuid: string | null;
   previewParentGuid: string | null;
+  pendingFocusGuid: string | null;
   isLoading: boolean;
   error: string | null;
   onNodesChange: OnNodesChange;
@@ -46,6 +47,7 @@ interface GraphEditorState {
     name?: string | null,
     scriptNodeId?: string | null
   ) => void;
+  clearSelection: () => void;
   setEntityCollapsed: (
     guid: string,
     collapsed: boolean,
@@ -79,6 +81,8 @@ interface GraphEditorState {
   toggleEntityCollapse: (guid: string) => void;
   upsertEntity: (entity: EntityPayload) => void;
   removeEntity: (guid: string) => void;
+  focusEntity: (entityGuid: string) => void;
+  clearPendingFocus: () => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setLoading: (value: boolean) => void;
@@ -190,6 +194,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   selectedEntityName: null,
   draggingEntityGuid: null,
   previewParentGuid: null,
+  pendingFocusGuid: null,
   isLoading: true,
   error: null,
   onNodesChange: (changes) => {
@@ -343,6 +348,11 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     }
 
     if (selectionChanged && currentEntityGuid) {
+      console.log("[GraphFocus] onNodesChange selectionChanged", {
+        currentEntityGuid,
+        currentScriptNodeId,
+        changes,
+      });
       sendRuntimeMessage({
         type: "GRAPH_SET_SELECTION",
         payload: { entityGuid: currentEntityGuid },
@@ -450,6 +460,12 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     const stateAlreadyCorrect =
       selectedEntityGuid === guid && selectedScriptNodeId === newScriptNodeId;
 
+    console.log("[GraphFocus] setSelectedEntity", {
+      guid,
+      scriptNodeId,
+      from: "store",
+    });
+
     if (!stateAlreadyCorrect) {
       set({
         selectedEntityGuid: guid,
@@ -485,6 +501,27 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         // Ignore communication errors
       });
     }
+  },
+  clearSelection: () => {
+    const state = get();
+    if (
+      state.selectedEntityGuid === null &&
+      state.selectedScriptNodeId === null
+    ) {
+      return;
+    }
+    console.log("[GraphFocus] clearSelection", {
+      entity: state.selectedEntityGuid,
+      scriptNode: state.selectedScriptNodeId,
+    });
+    set({
+      selectedEntityGuid: null,
+      selectedScriptNodeId: null,
+      selectedEntityName: null,
+      nodes: state.nodes.map((node) =>
+        node.selected ? { ...node, selected: false } : node
+      ),
+    });
   },
   setEntityCollapsed: (guid, collapsed, options = { source: "extension" }) => {
     if (!guid) {
@@ -948,6 +985,26 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         collapsedState,
       };
     });
+  },
+  focusEntity: (entityGuid) => {
+    if (!entityGuid) {
+      return;
+    }
+    const state = get();
+    const entity = state.entities[entityGuid];
+    if (!entity) {
+      return;
+    }
+    console.log("[GraphFocus] focusEntity request", { entityGuid });
+    state.clearSelection();
+    set({ pendingFocusGuid: entityGuid });
+    state.setSelectedEntity(entityGuid, entity.name ?? null, null);
+  },
+  clearPendingFocus: () => {
+    if (get().pendingFocusGuid !== null) {
+      console.log("[GraphFocus] clearPendingFocus");
+      set({ pendingFocusGuid: null });
+    }
   },
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),

@@ -246,6 +246,7 @@ const AttributeInput = ({
     },
     []
   );
+  const focusEntity = useGraphEditorStore((state) => state.focusEntity);
   const entityMatches = useMemo(() => {
     if (type !== "entity") {
       return [];
@@ -430,6 +431,7 @@ const AttributeInput = ({
                 type="button"
                 ref={searchButtonRef}
                 onPointerDownCapture={stopReactFlowEvent}
+                onMouseUpCapture={stopReactFlowEvent}
                 onClick={withStopPropagation(() =>
                   setEntityPickerOpen((open) => !open)
                 )}
@@ -472,6 +474,7 @@ const AttributeInput = ({
                               type="button"
                               key={candidate.guid}
                               onPointerDownCapture={stopReactFlowEvent}
+                              onMouseUpCapture={stopReactFlowEvent}
                               onClick={withStopPropagation(() => {
                                 onChange(candidate.guid);
                                 setEntityPickerOpen(false);
@@ -506,7 +509,26 @@ const AttributeInput = ({
             </div>
             <button
               type="button"
+              disabled={!currentId}
               onPointerDownCapture={stopReactFlowEvent}
+              onMouseUpCapture={stopReactFlowEvent}
+              onClick={withStopPropagation(() => {
+                if (currentId) {
+                  focusEntity(currentId);
+                }
+              })}
+              className={`rounded-md border px-2 py-1 font-semibold transition ${
+                currentId
+                  ? "border-pc-border-primary/60 text-pc-text-secondary hover:border-pc-text-active hover:text-pc-text-active"
+                  : "cursor-not-allowed border-pc-border-primary/30 text-pc-text-dark"
+              }`}
+            >
+              Focus
+            </button>
+            <button
+              type="button"
+              onPointerDownCapture={stopReactFlowEvent}
+              onMouseUpCapture={stopReactFlowEvent}
               onClick={withStopPropagation(() => {
                 onChange(null);
                 setEntityPickerOpen(false);
@@ -703,6 +725,7 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
           <button
             type="button"
             onPointerDownCapture={stopReactFlowEvent}
+              onMouseUpCapture={stopReactFlowEvent}
             onClick={withStopPropagation(() => removeItem(index))}
             className="rounded-lg border border-pc-border-primary/60 px-2 py-1 text-xs text-pc-text-secondary hover:border-pc-error hover:text-pc-error"
           >
@@ -713,6 +736,7 @@ const ArrayField = ({ current, onChange }: ArrayFieldProps) => {
       <button
         type="button"
         onPointerDownCapture={stopReactFlowEvent}
+        onMouseUpCapture={stopReactFlowEvent}
         onClick={withStopPropagation(addItem)}
         className="w-full rounded-lg border border-dashed border-pc-border-primary/60 px-3 py-2 text-sm text-pc-text-secondary hover:border-pc-text-active"
       >
