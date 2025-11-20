@@ -100,25 +100,26 @@
 
         // Find the corresponding asset ID from our global map
         const assetId = scriptNameToAssetIdMap.get(scriptName);
+        let definitions = null;
         if (!assetId) {
           // eslint-disable-next-line no-console
           console.warn(
-            `[GraphBridge] Could not find asset ID for script "${scriptName}" in the project-wide map.`
+            `[GraphBridge] Could not find asset ID for script "${scriptName}" in the project-wide map. Falling back to inferred attribute types.`
           );
-          return; // Skip this script if we can't find its definition
+        } else {
+          // Get the asset using the ID
+          const asset = editor.call("assets:get", assetId);
+          if (!asset) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              `[GraphBridge] Could not get asset with ID ${assetId}. Falling back to inferred attribute types.`
+            );
+          } else {
+            // Get the schema (definitions) from the asset data
+            definitions =
+              asset.get(`data.scripts.${scriptName}.attributes`) || null;
+          }
         }
-
-        // Get the asset using the ID
-        const asset = editor.call("assets:get", assetId);
-        if (!asset) {
-          // eslint-disable-next-line no-console
-          console.warn(`[GraphBridge] Could not get asset with ID ${assetId}.`);
-          return;
-        }
-
-        // Get the schema (definitions) from the asset data
-        const definitions =
-          asset.get(`data.scripts.${scriptName}.attributes`) || null;
         // Get the values from the entity's component instance
         const values = scriptComponentInstance.attributes || {};
 
@@ -129,12 +130,17 @@
 
         attributeNames.forEach((attrName) => {
           const definition = definitions ? definitions[attrName] : null;
-          const rawValue = Object.prototype.hasOwnProperty.call(values, attrName)
+          const rawValue = Object.prototype.hasOwnProperty.call(
+            values,
+            attrName
+          )
             ? values[attrName]
             : undefined;
           const resolvedValue = resolveAttributeValue(definition, rawValue);
           const attributeType =
-            (definition && definition.type) || inferAttributeType(rawValue) || "json";
+            (definition && definition.type) ||
+            inferAttributeType(rawValue) ||
+            "json";
 
           newAttributes[attrName] = {
             type: attributeType,
@@ -389,9 +395,9 @@
     const sceneId = config.scene?.id ?? null;
     const collapsedState = getCollapsedStateSnapshot();
 
-      return {
-        success: true,
-        data: {
+    return {
+      success: true,
+      data: {
         rootGuid,
         entities: Object.fromEntries(entitiesMap),
         selectedEntityName:
@@ -677,17 +683,17 @@
       });
 
       // Now that we are ready, set up the selector watcher for live updates.
-    editor.on("selector:change", () => {
-      try {
+      editor.on("selector:change", () => {
+        try {
           broadcastSelectionUpdate();
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error("[GraphBridge] selector update failed", error);
-      }
-    });
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error("[GraphBridge] selector update failed", error);
+        }
+      });
 
       // And perform the initial broadcast to load the scene graph.
-    broadcastSelection();
+      broadcastSelection();
       // Also broadcast initial selection state
       broadcastSelectionUpdate();
     });
