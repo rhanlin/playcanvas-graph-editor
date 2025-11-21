@@ -45,7 +45,8 @@ interface GraphEditorState {
   setSelectedEntity: (
     guid: string | null,
     name?: string | null,
-    scriptNodeId?: string | null
+    scriptNodeId?: string | null,
+    options?: { broadcast?: boolean }
   ) => void;
   clearSelection: () => void;
   setEntityCollapsed: (
@@ -81,13 +82,19 @@ interface GraphEditorState {
   toggleEntityCollapse: (guid: string) => void;
   upsertEntity: (entity: EntityPayload) => void;
   removeEntity: (guid: string) => void;
-  focusEntity: (entityGuid: string) => void;
+  focusEntity: (entityGuid: string, options?: FocusOptions) => void;
   clearPendingFocus: () => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   setLoading: (value: boolean) => void;
   setError: (message: string | null) => void;
   reset: () => void;
+}
+
+interface FocusOptions {
+  broadcast?: boolean;
+  requestViewportFocus?: boolean;
+  preserveSelection?: boolean;
 }
 
 const ENTITY_NODE_WIDTH = 250;
@@ -443,7 +450,12 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
 
     updateScriptAttribute(entityGuid, scriptName, attributeName, target);
   },
-  setSelectedEntity: (guid, name, scriptNodeId) => {
+  setSelectedEntity: (
+    guid,
+    name,
+    scriptNodeId,
+    options = { broadcast: true }
+  ) => {
     const state = get();
     const { nodes, selectedEntityGuid, selectedScriptNodeId } = state;
     const entityNode = nodes.find(
@@ -482,7 +494,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       }
     }
 
-    if (guid) {
+    const shouldBroadcast = options?.broadcast !== false;
+    if (guid && shouldBroadcast) {
       sendRuntimeMessage({
         type: "GRAPH_SET_SELECTION",
         payload: { entityGuid: guid },
@@ -975,7 +988,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       };
     });
   },
-  focusEntity: (entityGuid) => {
+  focusEntity: (entityGuid, options = {}) => {
     if (!entityGuid) {
       return;
     }
@@ -984,10 +997,22 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     if (!entity) {
       return;
     }
-    console.log("[GraphFocus] focusEntity request", { entityGuid });
-    state.clearSelection();
+    console.log("[GraphFocus] focusEntity request", { entityGuid, options });
+    if (!options?.preserveSelection) {
+      state.clearSelection();
+    }
     set({ pendingFocusGuid: entityGuid });
-    state.setSelectedEntity(entityGuid, entity.name ?? null, null);
+    state.setSelectedEntity(entityGuid, entity.name ?? null, null, {
+      broadcast: options?.broadcast !== false,
+    });
+    if (options?.requestViewportFocus !== false) {
+      sendRuntimeMessage({
+        type: "GRAPH_FOCUS_ENTITY",
+        payload: { entityGuid },
+      }).catch(() => {
+        // ignore errors if editor tab not reachable
+      });
+    }
   },
   clearPendingFocus: () => {
     if (get().pendingFocusGuid !== null) {

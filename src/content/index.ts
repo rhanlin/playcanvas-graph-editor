@@ -142,6 +142,22 @@ window.addEventListener("message", (event: MessageEvent) => {
     });
     return;
   }
+
+  if (data?.type === "PC_GRAPH_EDITOR_FOCUS") {
+    const focusPayload = (
+      data as { payload?: { entityGuid?: string; entityName?: string | null } }
+    ).payload;
+    if (focusPayload?.entityGuid) {
+      safeSendMessage({
+        type: "GRAPH_EDITOR_FOCUS",
+        payload: {
+          entityGuid: focusPayload.entityGuid,
+          entityName: focusPayload.entityName ?? null,
+        },
+      });
+    }
+    return;
+  }
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -176,7 +192,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     message?.type === "GRAPH_SET_SELECTION" ||
     message?.type === "GRAPH_UPDATE_ATTRIBUTE" ||
     message?.type === "GRAPH_SET_COLLAPSE_STATE" ||
-    message?.type === "GRAPH_REPARENT_ENTITY"
+    message?.type === "GRAPH_REPARENT_ENTITY" ||
+    message?.type === "GRAPH_FOCUS_ENTITY"
   ) {
     window.postMessage(message, "*");
     return false;

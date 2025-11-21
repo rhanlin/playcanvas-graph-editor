@@ -64,6 +64,11 @@ export interface UpdateSelectionPayload {
   entityName?: string | null;
 }
 
+export interface FocusEntityPayload {
+  entityGuid: string;
+  entityName?: string | null;
+}
+
 export interface GraphResponse {
   success: boolean;
   error?: string;
@@ -98,6 +103,8 @@ export type RuntimeMessage =
   | { type: "GRAPH_UPDATE_ATTRIBUTE"; payload: UpdateAttributePayload }
   | { type: "GRAPH_UPDATE_SELECTION"; payload: UpdateSelectionPayload }
   | { type: "GRAPH_SET_SELECTION"; payload: UpdateSelectionPayload }
+  | { type: "GRAPH_FOCUS_ENTITY"; payload: FocusEntityPayload }
+  | { type: "GRAPH_EDITOR_FOCUS"; payload: FocusEntityPayload }
   | { type: "GRAPH_ENTITY_ADDED"; payload: EntityMutationPayload }
   | { type: "GRAPH_ENTITY_UPDATED"; payload: EntityMutationPayload }
   | { type: "GRAPH_ENTITY_REMOVED"; payload: EntityRemovalPayload }

@@ -2,6 +2,7 @@
   let scriptNameToAssetIdMap = null;
   const entityWatchers = new Map();
   const collapseListenerMap = new WeakMap();
+  let cameraFocusListenerRegistered = false;
 
   function inferAttributeType(value) {
     if (value === null || value === undefined) {
@@ -309,6 +310,48 @@
     );
   }
 
+  function registerCameraFocusListener() {
+    const editor = window.editor;
+    if (
+      !editor ||
+      typeof editor.on !== "function" ||
+      cameraFocusListenerRegistered
+    ) {
+      return;
+    }
+
+    cameraFocusListenerRegistered = true;
+
+    const handleCameraFocus = () => {
+      try {
+        if (editor.call("selector:type") !== "entity") {
+          return;
+        }
+        const selection = editor.call("selector:items") || [];
+        if (!selection.length) {
+          return;
+        }
+        const observer = selection[0];
+        if (!observer || typeof observer.get !== "function") {
+          return;
+        }
+        const entityGuid = observer.get("resource_id");
+        if (!entityGuid) {
+          return;
+        }
+        const entityName = observer.get("name");
+        postGraphMessage("PC_GRAPH_EDITOR_FOCUS", {
+          entityGuid,
+          entityName,
+        });
+      } catch (error) {
+        console.error("[GraphBridge] Failed to emit editor focus event", error);
+      }
+    };
+
+    editor.on("camera:focus", handleCameraFocus);
+  }
+
   function getHierarchyTreeView() {
     const editor = window.editor;
     if (!editor || typeof editor.call !== "function") {
@@ -579,6 +622,30 @@
     }
   }
 
+  function handleFocusRequest(payload) {
+    const editor = window.editor;
+    if (!editor || !payload || !payload.entityGuid) {
+      return;
+    }
+
+    const entity = editor.call("entities:get", payload.entityGuid);
+    if (!entity) {
+      console.warn(
+        `[GraphBridge] Cannot focus entity: ${payload.entityGuid} not found`
+      );
+      return;
+    }
+
+    editor.call("selector:set", "entity", [entity]);
+    setTimeout(() => {
+      try {
+        editor.call("viewport:focus");
+      } catch (error) {
+        console.error("[GraphBridge] Failed to focus viewport", error);
+      }
+    }, 0);
+  }
+
   function handleCollapseStateRequest(payload) {
     const editor = window.editor;
     if (!editor || !payload || !payload.entityGuid) {
@@ -756,6 +823,8 @@
         initializeHierarchyCollapseWatcher();
       });
 
+      registerCameraFocusListener();
+
       // Listen for scripts being added to the registry
       // Reference: assets-script-registry.ts - this event fires when data.scripts is fully parsed
       // Event signature: assets:scripts:add(asset, scriptName)
@@ -926,6 +995,15 @@
         handleSetSelection(payload);
       } catch (e) {
         console.error("[GraphBridge] Failed to handle set selection:", e);
+      }
+      return;
+    }
+
+    if (type === "GRAPH_FOCUS_ENTITY") {
+      try {
+        handleFocusRequest(payload);
+      } catch (e) {
+        console.error("[GraphBridge] Failed to handle focus request:", e);
       }
       return;
     }

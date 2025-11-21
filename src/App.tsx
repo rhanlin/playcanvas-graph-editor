@@ -17,6 +17,7 @@ export default function App() {
     upsertEntity,
     removeEntity,
     applyCollapseStateUpdate,
+    focusEntity,
   } = useGraphEditorStore((state) => ({
     selectedEntityName: state.selectedEntityName,
     isLoading: state.isLoading,
@@ -28,6 +29,7 @@ export default function App() {
     upsertEntity: state.upsertEntity,
     removeEntity: state.removeEntity,
     applyCollapseStateUpdate: state.applyCollapseStateUpdate,
+    focusEntity: state.focusEntity,
   }));
 
   const requestGraphData = useCallback(() => {
@@ -60,8 +62,21 @@ export default function App() {
       if (message?.type === "GRAPH_UPDATE_SELECTION") {
         setSelectedEntity(
           message.payload.entityGuid,
-          message.payload.entityName
+          message.payload.entityName,
+          null,
+          { broadcast: false }
         );
+        return;
+      }
+
+      if (message?.type === "GRAPH_EDITOR_FOCUS") {
+        if (message.payload?.entityGuid) {
+          focusEntity(message.payload.entityGuid, {
+            broadcast: false,
+            requestViewportFocus: false,
+            preserveSelection: true,
+          });
+        }
         return;
       }
 
@@ -118,6 +133,7 @@ export default function App() {
     upsertEntity,
     removeEntity,
     applyCollapseStateUpdate,
+    focusEntity,
   ]);
 
   return (
