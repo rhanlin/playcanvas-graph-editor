@@ -338,6 +338,21 @@ export function GraphEditorCanvas() {
     };
   }, [reactFlowInstance, clearScriptAttribute]);
 
+  const minimapNodeColor = useCallback(() => "#364346", []);
+
+  const minimapNodeStrokeColor = useCallback(
+    (node: Node) => (node.selected ? "#f60" : "#2c393c"),
+    []
+  );
+
+  const minimapNodeClassName = useCallback(
+    (node: Node) =>
+      node.selected
+        ? "pc-minimap-node pc-minimap-node--selected"
+        : "pc-minimap-node",
+    []
+  );
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -355,7 +370,17 @@ export function GraphEditorCanvas() {
     >
       <Background />
       <Controls />
-      <MiniMap />
+      <MiniMap
+        className="pc-minimap"
+        style={{ background: "#2c393c" }}
+        nodeBorderRadius={8}
+        nodeStrokeWidth={1.5}
+        nodeStrokeColor={minimapNodeStrokeColor}
+        nodeColor={minimapNodeColor}
+        nodeClassName={minimapNodeClassName}
+        pannable
+        zoomable
+      />
     </ReactFlow>
   );
 }

@@ -25,3 +25,9 @@ body {
   stroke: #f60 !important;
   stroke-width: 3px;
 }
+
+.pc-minimap .react-flow__minimap-mask {
+  fill: #364346;
+  stroke: #20292b;
+  stroke-width: 1.5px;
+}
