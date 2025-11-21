@@ -37,8 +37,7 @@ const SCRIPT_VERTICAL_GAP = 12;
 const SCRIPT_NODE_WIDTH = 320;
 const SCRIPT_NODE_HEIGHT = 84;
 
-const ROOT_COLUMN_GAP = 120;
-const ROOT_ROW_GAP = 80;
+const ROOT_GRID_GAP = 48;
 
 export function buildGraphLayout({
   payload,
@@ -143,11 +142,10 @@ export function buildGraphLayout({
     1,
     Math.ceil(Math.sqrt(Math.max(1, topLevelEntities.length)))
   );
-  const columnWidth = ENTITY_MIN_WIDTH + 300;
-
   let currentRowY = 0;
-  let currentCol = 0;
-  let nextRowY = 0;
+  let currentRowHeight = 0;
+  let nodesInRow = 0;
+  let currentRowX = 0;
 
   const getStoredPosition = (
     id: string,
@@ -390,21 +388,24 @@ export function buildGraphLayout({
     };
   };
 
-  topLevelEntities.forEach((entity, index) => {
-    if (currentCol >= columnCount) {
-      currentCol = 0;
-      currentRowY = nextRowY;
+  topLevelEntities.forEach((entity) => {
+    if (nodesInRow >= columnCount) {
+      nodesInRow = 0;
+      currentRowX = 0;
+      currentRowY += currentRowHeight + ROOT_GRID_GAP;
+      currentRowHeight = 0;
     }
     const defaultTopPosition: XYPosition = {
-      x: currentCol * (columnWidth + ROOT_COLUMN_GAP),
+      x: currentRowX,
       y: currentRowY,
     };
     const position = getStoredPosition(entity.guid, null, defaultTopPosition);
 
     const result = buildSubtree(entity.guid, null, position);
 
-    currentCol += 1;
-    nextRowY = Math.max(nextRowY, currentRowY + result.height + ROOT_ROW_GAP);
+    currentRowX = position.x + result.width + ROOT_GRID_GAP;
+    currentRowHeight = Math.max(currentRowHeight, result.height);
+    nodesInRow += 1;
   });
 
   edges.push(...scriptEdgesMap);
