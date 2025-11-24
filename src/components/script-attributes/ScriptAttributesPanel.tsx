@@ -23,6 +23,7 @@ import type {
 } from "@/types/messaging";
 import { FieldTooltip } from "./FieldTooltip";
 import { cn } from "@/utils/cn";
+import { evaluate } from "@/utils/expr-eval";
 
 type ScriptAttributesPanelProps = {
   entityGuid: string;
@@ -43,47 +44,115 @@ const ensureVector = (value: unknown, size: number): number[] => {
   return Array.from({ length: size }, () => 0);
 };
 
+/**
+ * Evaluates a visibleif condition for script attributes.
+ * Supports multiple formats:
+ * 1. String expressions (e.g., "someAttribute === true", "value > 5")
+ * 2. Array of condition objects with lhs, rhs, operator
+ * 3. Object with key-value pairs (simple equality checks)
+ *
+ * This mirrors the behavior of the native PlayCanvas Editor's visibleif evaluation.
+ */
 const evaluateVisibleIf = (
   definition: ScriptAttributeDefinition | undefined,
   attributes: Record<string, ScriptAttributePayload> | undefined
-) => {
+): boolean => {
   if (!definition?.visibleif) {
     return true;
   }
-  const conditions = definition.visibleif;
+
+  const visibleIf = definition.visibleif;
   const values =
     attributes &&
     Object.fromEntries(
       Object.entries(attributes).map(([key, attr]) => [key, attr?.value])
     );
 
-  if (Array.isArray(conditions)) {
-    return conditions.every((cond) => evaluateSingleCondition(cond, values));
+  // Handle string expressions (e.g., "someAttribute === true")
+  if (typeof visibleIf === "string") {
+    return evaluateStringExpression(visibleIf, values);
   }
-  if (typeof conditions === "object") {
-    return Object.entries(conditions).every(([key, expected]) => {
+
+  // Handle array of conditions
+  if (Array.isArray(visibleIf)) {
+    return visibleIf.every((cond) => evaluateSingleCondition(cond, values));
+  }
+
+  // Handle object with key-value pairs (simple equality checks)
+  if (typeof visibleIf === "object" && visibleIf !== null) {
+    return Object.entries(visibleIf).every(([key, expected]) => {
       return values && values[key] === expected;
     });
   }
+
   return true;
 };
 
+/**
+ * Evaluates a string expression using the same parser as native PlayCanvas Editor.
+ * This ensures 100% compatibility with Editor's visibleif/enabledif expressions.
+ */
+const evaluateStringExpression = (
+  expression: string,
+  values: Record<string, unknown> | undefined
+): boolean => {
+  if (!values || !expression.trim()) {
+    return true;
+  }
+
+  try {
+    // Create evaluation context with attribute values
+    // Include null, undefined, true, false as they are commonly used in expressions
+    const context: Record<string, unknown> = {
+      ...values,
+      null: null,
+      undefined: undefined,
+      true: true,
+      false: false,
+    };
+
+    // Use the same parse and evaluate functions as native Editor
+    const result = evaluate(expression, context);
+    return !!result;
+  } catch (error) {
+    console.warn(
+      `[ScriptAttributesPanel] Failed to evaluate visibleif expression: "${expression}"`,
+      error
+    );
+    // On error, default to visible (fail-safe)
+    return true;
+  }
+};
+
+/**
+ * Evaluates a single condition object with lhs, rhs, and operator.
+ */
 const evaluateSingleCondition = (
   condition: any,
   values: Record<string, unknown> | undefined
-) => {
+): boolean => {
   if (!condition) {
     return true;
   }
+
+  // If condition is a string, treat it as an expression
+  if (typeof condition === "string") {
+    return evaluateStringExpression(condition, values);
+  }
+
+  // Handle condition object format
   const { lhs, rhs, operator = "==" } = condition;
   if (!values || !(lhs in values)) {
     return false;
   }
+
   const leftValue = values[lhs];
   switch (operator) {
     case "==":
+    case "===":
       return leftValue === rhs;
     case "!=":
+    case "!==":
       return leftValue !== rhs;
     case ">":
       return Number(leftValue) > Number(rhs);
@@ -105,15 +174,21 @@ export const ScriptAttributesPanel = memo(
     );
     const entities = useGraphEditorStore((state) => state.entities);
 
-    const sortedAttributes = useMemo(
-      () =>
-        Object.entries(attributes).sort(([aKey], [bKey]) =>
-          aKey.localeCompare(bKey)
-        ),
-      [attributes]
-    );
+    // Filter and sort attributes based on visibleif conditions
+    // This ensures that when attribute values change, visibleif conditions are re-evaluated
+    const visibleAttributes = useMemo(() => {
+      return Object.entries(attributes)
+        .filter(([name, attribute]) => {
+          if (!attribute) {
+            return false;
+          }
+          // Evaluate visibleif condition - this will re-run when attributes change
+          return evaluateVisibleIf(attribute.definition, attributes);
+        })
+        .sort(([aKey], [bKey]) => aKey.localeCompare(bKey));
+    }, [attributes]);
 
-    if (sortedAttributes.length === 0) {
+    if (visibleAttributes.length === 0) {
       return (
         <p className="text-xs italic text-pc-text-dark">
           No script attributes detected for this script.
@@ -123,11 +198,8 @@ export const ScriptAttributesPanel = memo(
 
     return (
       <div className="space-y-3">
-        {sortedAttributes.map(([name, attribute]) => {
+        {visibleAttributes.map(([name, attribute]) => {
           if (!attribute) {
-            return null;
-          }
-          if (!evaluateVisibleIf(attribute.definition, attributes)) {
             return null;
           }
           return (
@@ -226,6 +298,8 @@ type AttributeInputProps = {
   entities: Record<string, EntityPayload>;
   entityGuid: string;
   attributeKey: string;
+  // Context for evaluating nested visibleif conditions
+  parentContext?: Record<string, any>;
 };
 
 const AttributeInput = ({
@@ -236,6 +310,7 @@ const AttributeInput = ({
   entities,
   entityGuid,
   attributeKey,
+  parentContext,
 }: AttributeInputProps) => {
   const type = attribute.type || definition?.type || "string";
   const [isEntityPickerOpen, setEntityPickerOpen] = useState(false);
@@ -765,6 +840,8 @@ type JsonObjectFieldProps = {
   onChange: (next: Record<string, any>) => void;
   entities?: Record<string, EntityPayload>;
   entityGuid?: string;
+  // Context for evaluating visibleif - the current object's values
+  context?: Record<string, any>;
 };
 
 const JsonObjectField = ({
@@ -773,6 +850,7 @@ const JsonObjectField = ({
   onChange,
   entities,
   entityGuid,
+  context,
 }: JsonObjectFieldProps) => {
   const handleFieldChange = (fieldName: string, fieldValue: any) => {
     onChange({
@@ -781,9 +859,28 @@ const JsonObjectField = ({
     });
   };
 
+  // Filter schema fields based on visibleif conditions
+  // Use the current object's values as context for evaluation
+  const evaluationContext = context || value;
+  const visibleFields = useMemo(() => {
+    return schema.filter((field) => {
+      // Convert schema fields to attribute format for evaluation
+      const attributesForContext: Record<string, ScriptAttributePayload> = {};
+      schema.forEach((f) => {
+        attributesForContext[f.name] = {
+          type: f.type,
+          value:
+            evaluationContext?.[f.name] ?? getDefaultValueForSchemaField(f),
+          definition: f,
+        };
+      });
+      return evaluateVisibleIf(field, attributesForContext);
+    });
+  }, [schema, evaluationContext]);
+
   return (
     <div className="space-y-3 rounded-xl border border-pc-border-primary/50 bg-pc-dark p-3">
-      {schema.map((field) => {
+      {visibleFields.map((field) => {
         const fieldValue =
           value?.[field.name] ?? getDefaultValueForSchemaField(field);
         const fieldLabel = field.title || field.name;
@@ -813,6 +910,8 @@ const JsonObjectField = ({
                 entities={entities}
                 entityGuid={entityGuid}
                 attributeKey={field.name}
+                // Pass context for nested visibleif evaluation
+                parentContext={evaluationContext}
               />
             ) : (
               <div className="text-xs text-pc-text-dark">
@@ -898,6 +997,7 @@ const ArrayField = ({
                 onChange={(next) => handleItemChange(index, next)}
                 entities={entities}
                 entityGuid={entityGuid}
+                context={objValue}
               />
             </div>
           );
