@@ -32,9 +32,7 @@ export const EntityNode = memo(
       <div
         className={`relative h-full w-full rounded-3xl border border-pc-border-primary/60 bg-pc-primary/80 p-4 text-pc-text-primary shadow-xl shadow-black/40 transition-all ${
           collapsed ? "opacity-90" : ""
-        } ${
-          isDragging ? "opacity-50 cursor-grabbing" : ""
-        } ${
+        } ${isDragging ? "opacity-50 cursor-grabbing" : ""} ${
           // Preview effects take priority over selection
           isReparentingToRoot
             ? "!ring-4 !ring-pc-text-active !ring-offset-2 !ring-offset-pc-darkest !bg-pc-darkest/20 !border-pc-text-active/50"
@@ -50,7 +48,7 @@ export const EntityNode = memo(
             <p className="text-[11px] uppercase tracking-wide text-pc-text-dark">
               Entity
             </p>
-            <div className="text-lg font-bold leading-tight">
+            <div className="text-lg font-bold leading-tight mb-1">
               {data.label}
             </div>
             {childrenCount > 0 && (

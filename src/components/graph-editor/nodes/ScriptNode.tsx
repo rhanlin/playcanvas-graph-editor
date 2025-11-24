@@ -69,9 +69,16 @@ export const ScriptNode = memo(
               onClick={withStopPropagation(() => {
                 toggleScriptPanel(scriptNodeId);
               })}
-              className="rounded-full border border-pc-border-primary/60 bg-pc-darkest px-3 py-1 text-xs font-semibold text-pc-text-secondary transition hover:border-pc-text-active hover:text-pc-text-active"
+              className="rounded-full border border-pc-border-primary/80 bg-pc-dark p-1 text-pc-text-primary transition hover:bg-pc-darker"
+              aria-label={isCollapsed ? "Expand" : "Collapse"}
             >
-              {isCollapsed ? "Expand" : "Collapse"}
+              <span
+                className={`inline-block text-sm transition-transform ${
+                  isCollapsed ? "" : "rotate-180"
+                }`}
+              >
+                ▾
+              </span>
             </button>
           ) : null}
         </div>

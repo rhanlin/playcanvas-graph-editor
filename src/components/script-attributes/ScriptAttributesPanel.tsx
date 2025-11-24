@@ -1,4 +1,4 @@
-import {
+import React, {
   memo,
   useCallback,
   useEffect,
@@ -21,6 +21,7 @@ import type {
   ScriptAttributeDefinition,
   ScriptAttributePayload,
 } from "@/types/messaging";
+import { FieldTooltip } from "./FieldTooltip";
 
 type ScriptAttributesPanelProps = {
   entityGuid: string;
@@ -180,7 +181,7 @@ const AttributeField = ({
     <div className=" rounded-2xl border border-pc-border-primary/50 bg-pc-dark p-3 text-sm text-pc-text-primary">
       <div className="relative flex items-center justify-between gap-2">
         <div>
-          <p className="font-semibold">{label}</p>
+          <p className="font-semibold mb-1">{label}</p>
           {description ? (
             <p className="text-xs text-pc-text-dark">{description}</p>
           ) : null}
@@ -784,16 +785,15 @@ const JsonObjectField = ({
 
         return (
           <div key={field.name} className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-pc-text-primary">
+            <FieldTooltip
+              label={fieldLabel}
+              description={fieldDescription}
+              placement="right"
+            >
+              <p className="w-full text-xs font-semibold text-pc-text-primary">
                 {fieldLabel}
-              </label>
-              {fieldDescription && (
-                <span className="text-[10px] text-pc-text-dark">
-                  {fieldDescription}
-                </span>
-              )}
-            </div>
+              </p>
+            </FieldTooltip>
             {entities && entityGuid ? (
               <AttributeInput
                 value={fieldValue}
