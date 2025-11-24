@@ -369,7 +369,7 @@ export function GraphEditorCanvas() {
       fitView
     >
       <Background />
-      <Controls />
+      <Controls className="pc-controls" position="bottom-left" />
       <MiniMap
         className="pc-minimap"
         style={{ background: "#2c393c" }}

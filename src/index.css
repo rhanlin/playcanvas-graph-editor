@@ -1,3 +1,4 @@
+/* stylelint-disable */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -30,4 +31,37 @@ body {
   fill: #364346;
   stroke: #20292b;
   stroke-width: 1.5px;
+}
+
+.react-flow__attribution {
+  opacity: 0.08;
+  font-size: 10px;
+  color: #9aa1ab;
+  background: transparent;
+  box-shadow: none;
+  transition: opacity 150ms ease;
+}
+
+.react-flow__attribution:hover {
+  opacity: 0.25;
+}
+
+.pc-controls {
+  border: 1px solid #293538;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+.pc-controls .react-flow__controls-button {
+  background: #364346;
+  border-bottom: 1px solid #293538;
+  color: #d8e1e8;
+  transition: background 120ms ease, border 120ms ease, color 120ms ease;
+}
+
+.pc-controls .react-flow__controls-button svg {
+  fill: #d8e1e8;
+}
+
+.pc-controls .react-flow__controls-button:hover {
+  background: #2c393c;
 }
