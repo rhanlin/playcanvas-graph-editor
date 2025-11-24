@@ -14,7 +14,12 @@ body {
 
 .react-flow__edges,
 .react-flow__connection {
-  z-index: 6 !important;
+  z-index: 9999 !important;
+}
+
+.react-flow__edge-path,
+.react-flow__connection-path {
+  z-index: 9999 !important;
 }
 
 .react-flow__edge-path,
