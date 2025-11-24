@@ -24,6 +24,7 @@ import type {
 import { FieldTooltip } from "./FieldTooltip";
 import { cn } from "@/utils/cn";
 import { evaluate } from "@/utils/expr-eval";
+import { Input } from "@/components/ui/Input";
 
 type ScriptAttributesPanelProps = {
   entityGuid: string;
@@ -466,12 +467,11 @@ const AttributeInput = ({
             className="w-full"
           />
         ) : null}
-        <input
+        <Input
           type="number"
           value={value ?? ""}
-          onPointerDownCapture={stopReactFlowEvent}
-          onChange={(event) => onChange(Number(event.target.value))}
-          className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
+          onChange={(val) => onChange(Number(val))}
+          className="w-full"
         />
       </div>
     );
@@ -533,14 +533,14 @@ const AttributeInput = ({
                   onWheelCapture={stopWheelPropagation}
                 >
                   <div className="space-y-3">
-                    <input
+                    <Input
                       type="text"
                       value={entityQuery}
                       autoFocus
-                      onPointerDownCapture={stopReactFlowEvent}
-                      onChange={(event) => setEntityQuery(event.target.value)}
+                      onChange={(val) => setEntityQuery(String(val))}
                       placeholder="Search entity by name"
-                      className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
+                      deferUpdate={false}
+                      className="w-full text-pc-text-primary"
                     />
                     <div
                       className="max-h-60 overflow-y-scroll overscroll-contain rounded-xl border border-pc-border-primary/30"
@@ -689,15 +689,14 @@ const AttributeInput = ({
     );
   }
 
-  // string fallback
+  // string fallback - use unified Input component
   return (
-    <input
+    <Input
       type="text"
       value={value ?? ""}
       placeholder={definition?.placeholder}
-      onPointerDownCapture={stopReactFlowEvent}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
+      onChange={onChange}
+      className="w-full"
     />
   );
 };
@@ -773,15 +772,12 @@ const VectorField = ({
                   className="w-full"
                 />
               ) : null}
-              <input
+              <Input
                 type="number"
                 value={value?.[index] ?? 0}
                 step={step}
-                onPointerDownCapture={stopReactFlowEvent}
-                onChange={(event) =>
-                  handleAxisChange(index, Number(event.target.value))
-                }
-                className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
+                onChange={(val) => handleAxisChange(index, Number(val))}
+                className="w-full px-2 py-1"
               />
             </div>
           </div>
@@ -1023,15 +1019,14 @@ const ArrayField = ({
           key={`${index}-${String(entry)}`}
           className="flex items-center gap-2"
         >
-          <input
+          <Input
             type="text"
             value={String(entry ?? "")}
-            onPointerDownCapture={stopReactFlowEvent}
-            onChange={(event) => {
-              const parsed = parseArrayValue(event.target.value);
+            onChange={(val) => {
+              const parsed = parseArrayValue(String(val));
               handleItemChange(index, parsed);
             }}
-            className="flex-1 rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-pc-text-active"
+            className="flex-1"
           />
           <button
             type="button"
