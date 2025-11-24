@@ -54,7 +54,12 @@ export const ScriptNode = memo(
             <p className="text-[11px] uppercase tracking-wide text-pc-text-dark">
               Script
             </p>
-            <p className="font-bold text-sm text-pc-text-secondary">
+            <p
+              className={cn(
+                "font-bold text-sm mb-2 ",
+                isCollapsed ? "text-pc-text-secondary" : "text-pc-text-primary"
+              )}
+            >
               {data.label}
             </p>
             <p className="text-xs text-pc-text-dark">
