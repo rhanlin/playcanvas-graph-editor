@@ -5,6 +5,7 @@ import { ScriptAttributesPanel } from "@/components/script-attributes/ScriptAttr
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import type { ScriptAttributePayload } from "@/types/messaging";
 import { stopReactFlowEvent, withStopPropagation } from "@/utils/events";
+import { cn } from "@/utils/cn";
 
 type ScriptNodeData = {
   label: string;
@@ -41,11 +42,12 @@ export const ScriptNode = memo(
 
     return (
       <div
-        className={`flex flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all ${
+        className={cn(
+          "flex flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all",
           selected
             ? "border-pc-text-active bg-pc-darkest ring-2 ring-pc-text-active ring-offset-1 ring-offset-pc-darker"
             : "border-pc-text-active/40 bg-pc-dark/80"
-        }`}
+        )}
       >
         <div className="flex items-center justify-between gap-2">
           <div>
@@ -73,9 +75,10 @@ export const ScriptNode = memo(
               aria-label={isCollapsed ? "Expand" : "Collapse"}
             >
               <span
-                className={`inline-block text-sm transition-transform ${
-                  isCollapsed ? "" : "rotate-180"
-                }`}
+                className={cn(
+                  "inline-block text-sm transition-transform",
+                  !isCollapsed && "rotate-180"
+                )}
               >
                 ▾
               </span>

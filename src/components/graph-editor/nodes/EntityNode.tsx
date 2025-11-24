@@ -3,6 +3,7 @@ import { Handle, Position, type NodeProps } from "reactflow";
 
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import { stopReactFlowEvent, withStopPropagation } from "@/utils/events";
+import { cn } from "@/utils/cn";
 
 interface EntityNodeData {
   label: string;
@@ -30,18 +31,20 @@ export const EntityNode = memo(
 
     return (
       <div
-        className={`relative h-full w-full rounded-3xl border border-pc-border-primary/60 bg-pc-primary/80 p-4 text-pc-text-primary shadow-xl shadow-black/40 transition-all ${
-          collapsed ? "opacity-90" : ""
-        } ${isDragging ? "opacity-50 cursor-grabbing" : ""} ${
+        className={cn(
+          "relative h-full w-full rounded-3xl border border-pc-border-primary/60 bg-pc-primary/80 p-4 text-pc-text-primary shadow-xl shadow-black/40 transition-all",
+          collapsed && "opacity-90",
+          isDragging && "opacity-50 cursor-grabbing",
           // Preview effects take priority over selection
-          isReparentingToRoot
-            ? "!ring-4 !ring-pc-text-active !ring-offset-2 !ring-offset-pc-darkest !bg-pc-darkest/20 !border-pc-text-active/50"
-            : isPreviewTarget
-            ? "!ring-4 !ring-pc-text-active !ring-offset-2 !ring-offset-pc-darkest !bg-pc-darkest/20 !border-pc-text-active/50"
-            : selected
-            ? "ring-2 ring-pc-text-active ring-offset-2 ring-offset-pc-darkest"
-            : ""
-        }`}
+          isReparentingToRoot &&
+            "!ring-4 !ring-pc-text-active !ring-offset-2 !ring-offset-pc-darkest !bg-pc-darkest/20 !border-pc-text-active/50",
+          isPreviewTarget &&
+            "!ring-4 !ring-pc-text-active !ring-offset-2 !ring-offset-pc-darkest !bg-pc-darkest/20 !border-pc-text-active/50",
+          selected &&
+            !isReparentingToRoot &&
+            !isPreviewTarget &&
+            "ring-2 ring-pc-text-active ring-offset-2 ring-offset-pc-darkest"
+        )}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1">
@@ -67,9 +70,10 @@ export const EntityNode = memo(
             aria-label={collapsed ? "Expand entity" : "Collapse entity"}
           >
             <span
-              className={`inline-block text-sm transition-transform ${
-                collapsed ? "" : "rotate-180"
-              }`}
+              className={cn(
+                "inline-block text-sm transition-transform",
+                !collapsed && "rotate-180"
+              )}
             >
               ▾
             </span>

@@ -22,6 +22,7 @@ import type {
   ScriptAttributePayload,
 } from "@/types/messaging";
 import { FieldTooltip } from "./FieldTooltip";
+import { cn } from "@/utils/cn";
 
 type ScriptAttributesPanelProps = {
   entityGuid: string;
@@ -447,7 +448,10 @@ const AttributeInput = ({
               {isEntityPickerOpen ? (
                 <div
                   ref={pickerPanelRef}
-                  className={`nodrag absolute z-40 w-72 rounded-2xl border border-pc-border-primary/70 bg-pc-darkest/95 p-3 shadow-2xl backdrop-blur ${popupPlacementClass}`}
+                  className={cn(
+                    "nodrag absolute z-40 w-72 rounded-2xl border border-pc-border-primary/70 bg-pc-darkest/95 p-3 shadow-2xl backdrop-blur",
+                    popupPlacementClass
+                  )}
                   onPointerDownCapture={stopReactFlowEvent}
                   onMouseDown={stopReactFlowEvent}
                   onWheel={stopWheelPropagation}
@@ -489,11 +493,12 @@ const AttributeInput = ({
                                 setEntityPickerOpen(false);
                                 setEntityQuery("");
                               })}
-                              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition ${
+                              className={cn(
+                                "flex w-full items-center justify-between px-3 py-2 text-left text-sm transition",
                                 isActive
                                   ? "bg-pc-text-active/10 text-pc-text-primary font-semibold"
                                   : "text-pc-text-primary hover:bg-pc-dark"
-                              }`}
+                              )}
                             >
                               <span className="truncate pr-2">
                                 {displayName}
@@ -528,11 +533,12 @@ const AttributeInput = ({
                       focusEntity(currentId);
                     }
                   })}
-                  className={`rounded-md border px-2 py-1 font-semibold transition ${
+                  className={cn(
+                    "rounded-md border px-2 py-1 font-semibold transition",
                     currentId
                       ? "border-pc-border-primary/60 text-pc-text-secondary hover:border-pc-text-active hover:text-pc-text-active"
                       : "cursor-not-allowed border-pc-border-primary/30 text-pc-text-dark"
-                  }`}
+                  )}
                 >
                   Focus
                 </button>
