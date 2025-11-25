@@ -42,6 +42,7 @@ export const ScriptNode = memo(
 
     return (
       <div
+        data-type="script"
         className={cn(
           "flex flex-col rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm transition-all",
           selected

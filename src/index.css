@@ -28,8 +28,12 @@ body {
 }
 
 .react-flow__edge.selected path {
-  stroke: #f60 !important;
+  stroke: #f60;
   stroke-width: 3px;
+}
+
+.react-flow__node:has(> div[data-type="script"]) {
+  z-index: 1000 !important;
 }
 
 .pc-minimap .react-flow__minimap-mask {

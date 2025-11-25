@@ -31,6 +31,7 @@ export const EntityNode = memo(
 
     return (
       <div
+        data-type="entity"
         className={cn(
           "relative h-full w-full rounded-3xl border border-pc-border-primary/60 bg-pc-primary/80 p-4 text-pc-text-primary shadow-xl shadow-black/40 transition-all",
           collapsed && "opacity-90",
