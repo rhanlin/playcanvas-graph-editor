@@ -74,3 +74,14 @@ body {
 .pc-controls .react-flow__controls-button:hover {
   background: #2c393c;
 }
+
+/* Hide number input spinners */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}

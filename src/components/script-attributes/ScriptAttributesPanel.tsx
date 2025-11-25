@@ -714,17 +714,12 @@ const VectorField = ({
   definition,
   onChange,
 }: VectorFieldProps) => {
-  const [lockAxes, setLockAxes] = useState(false);
   const min = typeof definition?.min === "number" ? definition.min : undefined;
   const max = typeof definition?.max === "number" ? definition.max : undefined;
   const step = definition?.step || 0.1;
+  const hasRange = typeof min === "number" && typeof max === "number";
 
   const handleAxisChange = (axisIndex: number, nextValue: number) => {
-    if (lockAxes) {
-      const unified = Array.from({ length: size }, () => nextValue);
-      onChange(unified);
-      return;
-    }
     const next = [...value];
     next[axisIndex] = nextValue;
     onChange(next);
@@ -732,57 +727,58 @@ const VectorField = ({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-pc-text-dark">
-        <span>Interactive vector control</span>
-        <label className="inline-flex items-center gap-1">
-          <input
-            type="checkbox"
-            checked={lockAxes}
-            onPointerDownCapture={stopReactFlowEvent}
-            onChange={(event) => setLockAxes(event.target.checked)}
-            className="h-3 w-3 accent-pc-text-active"
-          />
-          <span>Lock axes</span>
-        </label>
-      </div>
-      <div className="space-y-2">
+      {/* Compact inline input fields - similar to Blender/Unity */}
+      <div className="flex flex-wrap gap-2">
         {Array.from({ length: size }, (_, index) => (
-          <div
-            key={AXIS_LABELS[index]}
-            className="rounded-xl bg-pc-darkest/80 px-3 py-2"
-          >
-            <div className="flex items-center justify-between text-xs text-pc-text-secondary">
-              <span>{AXIS_LABELS[index]}</span>
-              <span className="text-pc-text-primary font-semibold">
-                {Number(value?.[index] ?? 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="mt-2 space-y-2">
-              {typeof min === "number" && typeof max === "number" ? (
-                <input
-                  type="range"
-                  min={min}
-                  max={max}
-                  step={step}
-                  value={value?.[index] ?? min}
-                  onPointerDownCapture={stopReactFlowEvent}
-                  onChange={(event) =>
-                    handleAxisChange(index, Number(event.target.value))
-                  }
-                  className="w-full"
-                />
-              ) : null}
-              <Input
-                type="number"
-                value={value?.[index] ?? 0}
-                step={step}
-                onChange={(val) => handleAxisChange(index, Number(val))}
-                className="w-full px-2 py-1"
-              />
-            </div>
+          <div key={AXIS_LABELS[index]} className="flex-1 w-[80px] space-y-1">
+            <label className="block text-[10px] font-medium text-pc-text-secondary">
+              {AXIS_LABELS[index]}
+            </label>
+            <Input
+              type="number"
+              value={value?.[index] ?? 0}
+              step={step}
+              min={min}
+              max={max}
+              onChange={(val) => handleAxisChange(index, Number(val))}
+              deferUpdate={false}
+              className="w-full text-xs"
+            />
           </div>
         ))}
       </div>
+      {/* Optional sliders for range-limited vectors */}
+      {hasRange && (
+        <div className="space-y-2">
+          {Array.from({ length: size }, (_, index) => (
+            <div key={`slider-${AXIS_LABELS[index]}`} className="space-y-1">
+              <div className="flex items-center justify-between text-xs text-pc-text-dark">
+                <span>{AXIS_LABELS[index]}</span>
+                <span className="text-pc-text-secondary">
+                  {Number(value?.[index] ?? 0).toFixed(2)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={value?.[index] ?? min}
+                onPointerDownCapture={stopReactFlowEvent}
+                onPointerDown={stopReactFlowEvent}
+                onMouseDownCapture={stopReactFlowEvent}
+                onMouseDown={stopReactFlowEvent}
+                onPointerMoveCapture={stopReactFlowEvent}
+                onPointerMove={stopReactFlowEvent}
+                onChange={(event) =>
+                  handleAxisChange(index, Number(event.target.value))
+                }
+                className="w-full h-2 cursor-pointer rounded-lg bg-pc-darkest accent-pc-text-active"
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
