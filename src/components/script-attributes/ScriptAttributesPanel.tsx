@@ -25,6 +25,7 @@ import { FieldTooltip } from "./FieldTooltip";
 import { cn } from "@/utils/cn";
 import { evaluate } from "@/utils/expr-eval";
 import { Input } from "@/components/ui/Input";
+import { Slider } from "@/components/ui/Slider";
 
 type ScriptAttributesPanelProps = {
   entityGuid: string;
@@ -455,16 +456,15 @@ const AttributeInput = ({
       typeof definition?.max === "number";
     return (
       <div className="space-y-2">
-        {hasRange ? (
-          <input
-            type="range"
-            min={definition?.min}
-            max={definition?.max}
+        {hasRange &&
+        typeof definition.min === "number" &&
+        typeof definition.max === "number" ? (
+          <Slider
+            min={definition.min}
+            max={definition.max}
             step={definition?.step || 1}
-            value={typeof value === "number" ? value : definition?.min || 0}
-            onPointerDownCapture={stopReactFlowEvent}
-            onChange={(event) => onChange(Number(event.target.value))}
-            className="w-full"
+            value={typeof value === "number" ? value : definition.min || 0}
+            onChange={(val) => onChange(val)}
           />
         ) : null}
         <Input
@@ -758,22 +758,12 @@ const VectorField = ({
                   {Number(value?.[index] ?? 0).toFixed(2)}
                 </span>
               </div>
-              <input
-                type="range"
+              <Slider
                 min={min}
                 max={max}
                 step={step}
                 value={value?.[index] ?? min}
-                onPointerDownCapture={stopReactFlowEvent}
-                onPointerDown={stopReactFlowEvent}
-                onMouseDownCapture={stopReactFlowEvent}
-                onMouseDown={stopReactFlowEvent}
-                onPointerMoveCapture={stopReactFlowEvent}
-                onPointerMove={stopReactFlowEvent}
-                onChange={(event) =>
-                  handleAxisChange(index, Number(event.target.value))
-                }
-                className="w-full h-2 cursor-pointer rounded-lg bg-pc-darkest accent-pc-text-active"
+                onChange={(val) => handleAxisChange(index, val)}
               />
             </div>
           ))}
