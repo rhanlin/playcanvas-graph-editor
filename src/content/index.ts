@@ -187,6 +187,33 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
+  // Handle assets requests
+  if (message?.type === "GRAPH_REQUEST_ASSETS") {
+    const requestId = createRequestId();
+    const timeoutId = window.setTimeout(() => {
+      resolveRequest(requestId, {
+        success: false,
+        error: "Timed out waiting for assets",
+      });
+    }, REQUEST_TIMEOUT_MS);
+
+    pendingRequests.set(requestId, {
+      timeoutId,
+      resolve: sendResponse,
+    });
+
+    window.postMessage(
+      {
+        type: "GRAPH_REQUEST_ASSETS",
+        requestId,
+        payload: { assetType: message.assetType },
+      },
+      "*"
+    );
+
+    return true;
+  }
+
   // Forward selection and attribute updates to editor bridge
   if (
     message?.type === "GRAPH_SET_SELECTION" ||

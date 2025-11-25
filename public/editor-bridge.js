@@ -609,6 +609,59 @@
     respond(requestId, payload);
   }
 
+  function handleAssetsRequest(requestId, assetType) {
+    const editor = window.editor;
+    if (!editor || !editor.call) {
+      respond(requestId, {
+        success: false,
+        error: "Editor not available",
+        data: null,
+      });
+      return;
+    }
+
+    try {
+      // PlayCanvas Editor assets:list API doesn't accept filter object
+      // Instead, we get all assets and filter manually
+      const allAssets = editor.call("assets:list");
+
+      // Filter by type if specified
+      const assets = assetType
+        ? allAssets.filter((asset) => asset.get("type") === assetType)
+        : allAssets;
+      const assetList = assets
+        .map((asset) => {
+          try {
+            return {
+              id: asset.get("id"),
+              name: asset.get("name") || "(Unnamed asset)",
+              type: asset.get("type"),
+              filename: asset.get("file.filename") || asset.get("filename"),
+            };
+          } catch (error) {
+            console.error("[GraphBridge] Error serializing asset:", error);
+            return null;
+          }
+        })
+        .filter((asset) => asset !== null);
+
+      respond(requestId, {
+        success: true,
+        data: {
+          assets: assetList,
+          assetType: assetType,
+        },
+      });
+    } catch (error) {
+      console.error("[GraphBridge] Failed to get assets:", error);
+      respond(requestId, {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to get assets",
+        data: null,
+      });
+    }
+  }
+
   function handleSetSelection(payload) {
     const editor = window.editor;
     if (!editor) return;
@@ -1031,6 +1084,19 @@
         handleAttributeUpdate(payload);
       } catch (e) {
         console.error("[GraphBridge] Failed to handle attribute update:", e);
+      }
+      return;
+    }
+
+    if (type === "GRAPH_REQUEST_ASSETS") {
+      try {
+        handleAssetsRequest(requestId, payload?.assetType);
+      } catch (e) {
+        console.error("[GraphBridge] Failed to handle assets request:", e);
+        respond(requestId, {
+          success: false,
+          error: e instanceof Error ? e.message : "Unknown error occurred",
+        });
       }
       return;
     }

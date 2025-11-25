@@ -10,7 +10,12 @@ import type {
 } from "reactflow";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "reactflow";
 
-import type { EntityPayload, SceneGraphPayload } from "@/types/messaging";
+import type {
+  AssetPayload,
+  AssetsListPayload,
+  EntityPayload,
+  SceneGraphPayload,
+} from "@/types/messaging";
 import { buildGraphLayout, type PositionOverride } from "@/utils/graphLayout";
 import { sendRuntimeMessage } from "@/utils/runtime";
 
@@ -89,6 +94,7 @@ interface GraphEditorState {
   setLoading: (value: boolean) => void;
   setError: (message: string | null) => void;
   reset: () => void;
+  getAssets: (assetType?: string) => Promise<AssetPayload[]>;
 }
 
 interface FocusOptions {
@@ -1050,6 +1056,27 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       isLoading: true,
       error: null,
     }),
+  getAssets: async (assetType?: string) => {
+    try {
+      const response = await sendRuntimeMessage<{
+        success: boolean;
+        error?: string;
+        data?: AssetsListPayload;
+      }>({
+        type: "GRAPH_REQUEST_ASSETS",
+        assetType,
+      });
+
+      if (response.success && response.data?.assets) {
+        return response.data.assets;
+      }
+      console.warn("[GraphStore] getAssets: No assets in response", response);
+      return [];
+    } catch (error) {
+      console.error("[GraphStore] Failed to get assets:", error);
+      return [];
+    }
+  },
 }));
 
 // Expose store to window for debugging (optional)

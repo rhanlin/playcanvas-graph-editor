@@ -95,6 +95,18 @@ export interface ReparentEntityPayload {
   preserveTransform?: boolean;
 }
 
+export interface AssetPayload {
+  id: string | number;
+  name: string;
+  type: string;
+  filename?: string;
+}
+
+export interface AssetsListPayload {
+  assets: AssetPayload[];
+  assetType?: string;
+}
+
 export type RuntimeMessage =
   | { type: "GRAPH_REQUEST_DATA" }
   | { type: "GRAPH_RESPONSE_DATA"; payload: SceneGraphPayload }
@@ -116,4 +128,5 @@ export type RuntimeMessage =
       type: "GRAPH_SET_COLLAPSE_STATE";
       payload: CollapseStateUpdatePayload;
     }
-  | { type: "GRAPH_REPARENT_ENTITY"; payload: ReparentEntityPayload };
+  | { type: "GRAPH_REPARENT_ENTITY"; payload: ReparentEntityPayload }
+  | { type: "GRAPH_REQUEST_ASSETS"; assetType?: string };
