@@ -446,6 +446,52 @@ const AttributeInput = ({
     }
   }, [popupPlacement]);
 
+  // Handle enum types FIRST (before type-specific checks)
+  // This ensures number enums and string enums both show as select dropdowns
+  if (definition?.enum?.options) {
+    const options = definition.enum.options;
+    const order = definition.enum.order || Object.keys(options);
+
+    // Determine the value type by checking the first option
+    const firstValue = options[order[0]];
+    const isNumberEnum = typeof firstValue === "number";
+    const isBooleanEnum = typeof firstValue === "boolean";
+
+    // Convert value to string for comparison in select element
+    const stringValue = value != null ? String(value) : "";
+
+    const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+      const selectedValue = event.target.value;
+      // Convert back to original type
+      if (isNumberEnum) {
+        onChange(Number(selectedValue));
+      } else if (isBooleanEnum) {
+        onChange(selectedValue === "true");
+      } else {
+        onChange(selectedValue);
+      }
+    };
+
+    return (
+      <select
+        value={stringValue}
+        onPointerDownCapture={stopReactFlowEvent}
+        onChange={handleChange}
+        className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
+      >
+        {order.map((label: string) => {
+          const val = options[label];
+          if (val === undefined) return null;
+          return (
+            <option key={label} value={String(val)}>
+              {label}
+            </option>
+          );
+        })}
+      </select>
+    );
+  }
+
   if (type === "boolean") {
     return (
       <label className="inline-flex items-center gap-2 text-sm">
@@ -956,24 +1002,6 @@ const AttributeInput = ({
           </div>
         </div>
       </div>
-    );
-  }
-
-  if (definition?.enum?.options) {
-    const options = definition.enum.options;
-    return (
-      <select
-        value={value ?? ""}
-        onPointerDownCapture={stopReactFlowEvent}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
-      >
-        {Object.entries(options).map(([label, val]) => (
-          <option key={label} value={String(val)}>
-            {label}
-          </option>
-        ))}
-      </select>
     );
   }
 

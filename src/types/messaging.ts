@@ -6,7 +6,10 @@ export interface ScriptAttributeDefinition {
   description?: string;
   default?: any;
   placeholder?: string;
-  enum?: { options?: Record<string, string | number | boolean> };
+  enum?: {
+    options?: Record<string, string | number | boolean>;
+    order?: string[];
+  };
   options?: Record<string, any>;
   min?: number;
   max?: number;
