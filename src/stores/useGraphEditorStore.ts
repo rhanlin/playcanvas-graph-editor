@@ -290,20 +290,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     let baseNodes: Node[] = updatedNodes;
     let baseEdges: Edge[] = state.edges;
 
-    if (manualUpdateKeys.length > 0) {
-      const layoutResult = buildLayoutFromState(
-        state.rootGuid,
-        state.entities,
-        state.selectedEntityName,
-        manualPositions,
-        state.collapsedState,
-        state.projectId,
-        state.sceneId
-      );
-      baseNodes = layoutResult.nodes;
-      baseEdges = layoutResult.edges;
-    }
-
     const decorateSelection = (nodesToDecorate: Node[]): Node[] => {
       return nodesToDecorate.map((node) => {
         let isSelected = false;
@@ -543,6 +529,20 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       return;
     }
 
+    const preservedPositions: Record<string, PositionOverride> = {
+      ...state.manualPositions,
+    };
+    state.nodes.forEach((node) => {
+      const existing = preservedPositions[node.id];
+      if (!existing || existing.parentId !== (node.parentNode ?? null)) {
+        preservedPositions[node.id] = {
+          x: node.position.x,
+          y: node.position.y,
+          parentId: node.parentNode ?? null,
+        };
+      }
+    });
+
     const collapsedState = collapsed
       ? { ...state.collapsedState, [guid]: true }
       : (() => {
@@ -555,7 +555,7 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       state.rootGuid,
       state.entities,
       state.selectedEntityName,
-      state.manualPositions,
+      preservedPositions,
       collapsedState,
       state.projectId,
       state.sceneId
@@ -565,13 +565,14 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       collapsedState,
       nodes,
       edges,
+      manualPositions: preservedPositions,
     });
 
     if (state.projectId != null && state.sceneId != null) {
       persistLayoutState(
         state.projectId,
         state.sceneId,
-        state.manualPositions,
+        preservedPositions,
         collapsedState
       );
     }
