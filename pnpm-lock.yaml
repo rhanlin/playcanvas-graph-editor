@@ -11,6 +11,9 @@ importers:
       '@floating-ui/react':
         specifier: ^0.27.16
         version: 0.27.16(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@playcanvas/pcui':
+        specifier: ^5.3.3
+        version: 5.3.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
@@ -560,6 +563,17 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@playcanvas/observer@1.6.6':
+    resolution: {integrity: sha512-UMpiEG6VFmgDI2KkKE1I1swommG2AxBQA/zuCoUt+HeUzNOhSSdfED6tVTPluQ+nxp2ScUYSaBCBsjVC/goSiA==}
+    engines: {node: '>=18.0.0'}
+
+  '@playcanvas/pcui@5.3.3':
+    resolution: {integrity: sha512-mdyhuP2CxDR4Ld8VlVfVDff79wuMycpgAdLZ26+cI/rLo3Fa9q5rSUzCRVpb2pPJI0R60zsxM2UWEE9pMBzlfA==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      react: ^18.3.1 || ^19.0.0
+      react-dom: ^18.3.1 || ^19.0.0
 
   '@reactflow/background@11.3.14':
     resolution: {integrity: sha512-Gewd7blEVT5Lh6jqrvOgd4G6Qk17eGKQfsDXgyRSqM+CTwDqRldG2LsWN4sNeno6sbqVIC2fZ+rAUBFA9ZEUDA==}
@@ -2238,6 +2252,14 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@playcanvas/observer@1.6.6': {}
+
+  '@playcanvas/pcui@5.3.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@playcanvas/observer': 1.6.6
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@reactflow/background@11.3.14(@types/react@18.3.26)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:

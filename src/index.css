@@ -85,3 +85,9 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+.pcui-overlay:has(.pcui-color-picker),
+.pcui-overlay[class*="color"] {
+  z-index: 9999 !important;
+  position: fixed !important;
+}

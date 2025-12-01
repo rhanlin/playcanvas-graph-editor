@@ -26,6 +26,8 @@ import { cn } from "@/utils/cn";
 import { evaluate } from "@/utils/expr-eval";
 import { Input } from "@/components/ui/Input";
 import { Slider } from "@/components/ui/Slider";
+import "@playcanvas/pcui/styles";
+import { ColorPicker } from "@playcanvas/pcui/react";
 
 type ScriptAttributesPanelProps = {
   entityGuid: string;
@@ -533,6 +535,88 @@ const AttributeInput = ({
           className="w-full"
         />
       </div>
+    );
+  }
+
+  // Handle Color types (rgb, rgba, or when definition.color exists)
+  if (type === "rgb" || type === "rgba" || definition?.color !== undefined) {
+    // Color values are arrays [r, g, b, a] with values in range 0-1
+    const channels = type === "rgba" || definition?.color === 4 ? 4 : 3;
+
+    // Memoize colorValue to prevent unnecessary re-renders
+    const colorValue = useMemo(() => {
+      if (Array.isArray(value) && value.length >= channels) {
+        // Return a new array with correct length to ensure reference stability
+        return value.slice(0, channels);
+      }
+      // Default values
+      return channels === 4 ? [0, 0, 0, 1] : [0, 0, 0];
+    }, [value, channels]);
+
+    // Use useRef to track the last update time and prevent rapid-fire updates
+    const lastUpdateRef = useRef<number>(0);
+    const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Use useCallback to stabilize the onChange handler
+    const handleColorChange = useCallback(
+      (newColor: number[]) => {
+        // ColorPicker returns values in range 0-1, which is what we need
+        // Ensure we only pass the correct number of channels
+        const normalizedColor = newColor.slice(0, channels);
+
+        // Compare with current value to prevent unnecessary updates
+        const currentValue = Array.isArray(value)
+          ? value.slice(0, channels)
+          : null;
+        if (currentValue && currentValue.length === normalizedColor.length) {
+          const hasChanged = currentValue.some(
+            (val, idx) => Math.abs(val - normalizedColor[idx]) > 0.0001
+          );
+          if (!hasChanged) {
+            return; // Value hasn't changed, skip update
+          }
+        }
+
+        // Clear any pending update
+        if (pendingUpdateRef.current) {
+          clearTimeout(pendingUpdateRef.current);
+        }
+
+        // Throttle updates to prevent too frequent state changes
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastUpdateRef.current;
+
+        if (timeSinceLastUpdate > 50) {
+          // Update immediately if enough time has passed
+          lastUpdateRef.current = now;
+          onChange(normalizedColor);
+        } else {
+          // Debounce rapid updates
+          pendingUpdateRef.current = setTimeout(() => {
+            lastUpdateRef.current = Date.now();
+            onChange(normalizedColor);
+            pendingUpdateRef.current = null;
+          }, 50);
+        }
+      },
+      [onChange, channels, value]
+    );
+
+    // Cleanup pending update on unmount
+    useEffect(() => {
+      return () => {
+        if (pendingUpdateRef.current) {
+          clearTimeout(pendingUpdateRef.current);
+        }
+      };
+    }, []);
+
+    return (
+      <ColorPicker
+        value={colorValue}
+        onChange={handleColorChange}
+        channels={channels}
+      />
     );
   }
 
