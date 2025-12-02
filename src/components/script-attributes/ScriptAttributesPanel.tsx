@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/Input";
 import { Slider } from "@/components/ui/Slider";
 import "@playcanvas/pcui/styles";
 import { ColorPicker } from "@playcanvas/pcui/react";
+import { findTypeHandler } from "./type-handlers";
 
 type ScriptAttributesPanelProps = {
   entityGuid: string;
@@ -448,106 +449,43 @@ const AttributeInput = ({
     }
   }, [popupPlacement]);
 
-  // Handle enum types FIRST (before type-specific checks)
-  // This ensures number enums and string enums both show as select dropdowns
-  if (definition?.enum?.options) {
-    const options = definition.enum.options;
-    const order = definition.enum.order || Object.keys(options);
+  // Try to find a matching type handler
+  // For complex types (entity, asset, array, json, colorArray), we still use the old logic below
+  const handler = findTypeHandler({
+    type,
+    definition,
+    value,
+    attributeKey,
+  });
 
-    // Determine the value type by checking the first option
-    const firstValue = options[order[0]];
-    const isNumberEnum = typeof firstValue === "number";
-    const isBooleanEnum = typeof firstValue === "boolean";
+  // If handler exists and returns a valid component (not null), use it
+  if (handler) {
+    const rendered = handler.render({
+      type,
+      value,
+      definition,
+      onChange,
+      entities,
+      entityGuid,
+      attributeKey,
+      useState,
+      useEffect,
+      useLayoutEffect,
+      useMemo,
+      useCallback,
+      useRef,
+    });
 
-    // Convert value to string for comparison in select element
-    const stringValue = value != null ? String(value) : "";
-
-    const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-      const selectedValue = event.target.value;
-      // Convert back to original type
-      if (isNumberEnum) {
-        onChange(Number(selectedValue));
-      } else if (isBooleanEnum) {
-        onChange(selectedValue === "true");
-      } else {
-        onChange(selectedValue);
-      }
-    };
-
-    return (
-      <select
-        value={stringValue}
-        onPointerDownCapture={stopReactFlowEvent}
-        onChange={handleChange}
-        className="w-full rounded-lg border border-pc-border-primary bg-pc-darkest px-3 py-2 text-sm text-pc-text-primary outline-none focus:ring-2 focus:ring-pc-text-active"
-      >
-        {order.map((label: string) => {
-          const val = options[label];
-          if (val === undefined) return null;
-          return (
-            <option key={label} value={String(val)}>
-              {label}
-            </option>
-          );
-        })}
-      </select>
-    );
-  }
-
-  if (type === "boolean") {
-    return (
-      <label className="inline-flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={!!value}
-          onPointerDownCapture={stopReactFlowEvent}
-          onChange={(event) => onChange(event.target.checked)}
-          className="h-4 w-4 accent-pc-text-active"
-        />
-        <span className="text-pc-text-secondary">
-          {definition?.placeholder || "Toggle"}
-        </span>
-      </label>
-    );
-  }
-
-  if (type === "number") {
-    const hasRange =
-      typeof definition?.min === "number" &&
-      typeof definition?.max === "number";
-    return (
-      <div className="space-y-2">
-        {hasRange &&
-        typeof definition.min === "number" &&
-        typeof definition.max === "number" ? (
-          <Slider
-            min={definition.min}
-            max={definition.max}
-            step={definition?.step || 1}
-            value={typeof value === "number" ? value : definition.min || 0}
-            onChange={(val) => onChange(val)}
-          />
-        ) : null}
-        <Input
-          type="number"
-          value={value ?? ""}
-          onChange={(val) => onChange(Number(val))}
-          className="w-full"
-        />
-      </div>
-    );
+    // If handler returned null, it means it needs special handling (e.g., ColorArrayField, ArrayField)
+    // Fall through to the old logic below
+    if (rendered !== null) {
+      return <>{rendered}</>;
+    }
   }
 
   // Handle Color[] array types FIRST (before single Color types)
-  // According to Editor logic:
-  // - When attributeData.color exists, type becomes 'gradient'
-  // - When attributeData.array also exists, type becomes 'array:gradient'
-  // - Or type could be 'json' with attributeData.array === true and attributeData.color exists
-  // Color[] is detected when:
-  // - type is "rgb" or "rgba" AND definition.array === true
-  // - OR type starts with "array:rgb" or "array:rgba"
-  // - OR type is "array:gradient"
-  // - OR definition.type includes "Color[]"
+  // This is kept here because ColorArrayField depends on components from this file
+  // TODO: Extract ColorArrayField to a separate file and move this to type-handlers
   const isColorArray =
     (type === "rgb" && definition?.array === true) ||
     (type === "rgba" && definition?.array === true) ||
@@ -562,23 +500,6 @@ const AttributeInput = ({
     (type === "json" &&
       definition?.array === true &&
       definition?.color !== undefined);
-
-  // Debug log for Color[] attributes
-  if (
-    attributeKey === "gradientStops" ||
-    definition?.type?.includes("Color[]")
-  ) {
-    console.log("[ColorArray Debug]", {
-      attributeKey,
-      type,
-      definitionType: definition?.type,
-      hasColor: definition?.color !== undefined,
-      colorValue: definition?.color,
-      hasArray: definition?.array === true,
-      isColorArray,
-      value,
-    });
-  }
 
   if (isColorArray) {
     // Determine channels based on type (rgba = 4, rgb = 3)
@@ -632,108 +553,8 @@ const AttributeInput = ({
     );
   }
 
-  // Handle Color types (rgb, rgba, or when definition.color exists)
-  // Note: This should NOT match Color[] arrays, only single Color values
-  // Single Color: definition.color exists but definition.array does NOT exist
-  if (
-    type === "rgb" ||
-    type === "rgba" ||
-    (definition?.color !== undefined &&
-      !definition?.array &&
-      type !== "array" &&
-      type !== "json")
-  ) {
-    // Color values are arrays [r, g, b, a] with values in range 0-1
-    const channels = type === "rgba" || definition?.color === 4 ? 4 : 3;
-
-    // Memoize colorValue to prevent unnecessary re-renders
-    const colorValue = useMemo(() => {
-      if (Array.isArray(value) && value.length >= channels) {
-        // Return a new array with correct length to ensure reference stability
-        return value.slice(0, channels);
-      }
-      // Default values
-      return channels === 4 ? [0, 0, 0, 1] : [0, 0, 0];
-    }, [value, channels]);
-
-    // Use useRef to track the last update time and prevent rapid-fire updates
-    const lastUpdateRef = useRef<number>(0);
-    const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Use useCallback to stabilize the onChange handler
-    const handleColorChange = useCallback(
-      (newColor: number[]) => {
-        // ColorPicker returns values in range 0-1, which is what we need
-        // Ensure we only pass the correct number of channels
-        const normalizedColor = newColor.slice(0, channels);
-
-        // Compare with current value to prevent unnecessary updates
-        const currentValue = Array.isArray(value)
-          ? value.slice(0, channels)
-          : null;
-        if (currentValue && currentValue.length === normalizedColor.length) {
-          const hasChanged = currentValue.some(
-            (val, idx) => Math.abs(val - normalizedColor[idx]) > 0.0001
-          );
-          if (!hasChanged) {
-            return; // Value hasn't changed, skip update
-          }
-        }
-
-        // Clear any pending update
-        if (pendingUpdateRef.current) {
-          clearTimeout(pendingUpdateRef.current);
-        }
-
-        // Throttle updates to prevent too frequent state changes
-        const now = Date.now();
-        const timeSinceLastUpdate = now - lastUpdateRef.current;
-
-        if (timeSinceLastUpdate > 50) {
-          // Update immediately if enough time has passed
-          lastUpdateRef.current = now;
-          onChange(normalizedColor);
-        } else {
-          // Debounce rapid updates
-          pendingUpdateRef.current = setTimeout(() => {
-            lastUpdateRef.current = Date.now();
-            onChange(normalizedColor);
-            pendingUpdateRef.current = null;
-          }, 50);
-        }
-      },
-      [onChange, channels, value]
-    );
-
-    // Cleanup pending update on unmount
-    useEffect(() => {
-      return () => {
-        if (pendingUpdateRef.current) {
-          clearTimeout(pendingUpdateRef.current);
-        }
-      };
-    }, []);
-
-    return (
-      <ColorPicker
-        value={colorValue}
-        onChange={handleColorChange}
-        channels={channels}
-      />
-    );
-  }
-
-  if (type.startsWith("vec")) {
-    const size = Number(type.replace("vec", "")) || 3;
-    return (
-      <VectorField
-        size={size as 2 | 3 | 4}
-        value={ensureVector(value, size)}
-        onChange={onChange}
-        definition={definition}
-      />
-    );
-  }
+  // Color and Vector types are now handled by type-handlers
+  // (Removed old logic - now using type-handlers system)
 
   if (type === "entity") {
     const currentId = value ? String(value) : "";
