@@ -538,8 +538,111 @@ const AttributeInput = ({
     );
   }
 
+  // Handle Color[] array types FIRST (before single Color types)
+  // According to Editor logic:
+  // - When attributeData.color exists, type becomes 'gradient'
+  // - When attributeData.array also exists, type becomes 'array:gradient'
+  // - Or type could be 'json' with attributeData.array === true and attributeData.color exists
+  // Color[] is detected when:
+  // - type is "rgb" or "rgba" AND definition.array === true
+  // - OR type starts with "array:rgb" or "array:rgba"
+  // - OR type is "array:gradient"
+  // - OR definition.type includes "Color[]"
+  const isColorArray =
+    (type === "rgb" && definition?.array === true) ||
+    (type === "rgba" && definition?.array === true) ||
+    type === "array:gradient" ||
+    type.startsWith("array:rgb") ||
+    type.startsWith("array:rgba") ||
+    definition?.type?.includes("Color[]") ||
+    definition?.type?.includes("rgb[]") ||
+    definition?.type?.includes("rgba[]") ||
+    (definition?.color !== undefined && definition?.array === true) ||
+    (type === "array" && definition?.color !== undefined) ||
+    (type === "json" &&
+      definition?.array === true &&
+      definition?.color !== undefined);
+
+  // Debug log for Color[] attributes
+  if (
+    attributeKey === "gradientStops" ||
+    definition?.type?.includes("Color[]")
+  ) {
+    console.log("[ColorArray Debug]", {
+      attributeKey,
+      type,
+      definitionType: definition?.type,
+      hasColor: definition?.color !== undefined,
+      colorValue: definition?.color,
+      hasArray: definition?.array === true,
+      isColorArray,
+      value,
+    });
+  }
+
+  if (isColorArray) {
+    // Determine channels based on type (rgba = 4, rgb = 3)
+    const channels = type === "rgba" || definition?.color === 4 ? 4 : 3;
+
+    // Normalize value: Color[] should be a 2D array [[r,g,b], [r,g,b], ...]
+    // But based on the log, value might be a single color array [r,g,b,a]
+    // We need to handle both cases
+    const normalizeColorList = (val: unknown): number[][] => {
+      if (!Array.isArray(val)) {
+        return [];
+      }
+
+      // If it's already a 2D array (array of color arrays)
+      if (val.length > 0 && Array.isArray(val[0])) {
+        return (val as unknown[]).map((item) => {
+          if (Array.isArray(item)) {
+            const normalized = item.slice(0, channels) as number[];
+            while (normalized.length < channels) {
+              normalized.push(
+                channels === 4 && normalized.length === 3 ? 1 : 0
+              );
+            }
+            return normalized;
+          }
+          return channels === 4 ? [0, 0, 0, 1] : [0, 0, 0];
+        });
+      }
+
+      // If it's a single color array [r,g,b,a], wrap it in an array
+      // This shouldn't happen for Color[], but handle it gracefully
+      if (val.length >= channels && val.every((v) => typeof v === "number")) {
+        const normalized = val.slice(0, channels) as number[];
+        while (normalized.length < channels) {
+          normalized.push(channels === 4 && normalized.length === 3 ? 1 : 0);
+        }
+        return [normalized];
+      }
+
+      return [];
+    };
+
+    const colorList = normalizeColorList(value);
+
+    return (
+      <ColorArrayField
+        current={colorList}
+        onChange={onChange}
+        channels={channels}
+      />
+    );
+  }
+
   // Handle Color types (rgb, rgba, or when definition.color exists)
-  if (type === "rgb" || type === "rgba" || definition?.color !== undefined) {
+  // Note: This should NOT match Color[] arrays, only single Color values
+  // Single Color: definition.color exists but definition.array does NOT exist
+  if (
+    type === "rgb" ||
+    type === "rgba" ||
+    (definition?.color !== undefined &&
+      !definition?.array &&
+      type !== "array" &&
+      type !== "json")
+  ) {
     // Color values are arrays [r, g, b, a] with values in range 0-1
     const channels = type === "rgba" || definition?.color === 4 ? 4 : 3;
 
@@ -1571,6 +1674,281 @@ const ArrayField = ({
         className="w-full rounded-lg border border-dashed border-pc-border-primary/60 px-3 py-2 text-sm text-pc-text-secondary hover:border-pc-text-active"
       >
         + Add Item
+      </button>
+    </div>
+  );
+};
+
+type ColorArrayItemProps = {
+  index: number;
+  colorValue: unknown;
+  channels: 3 | 4;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  onChange: (nextColor: number[]) => void;
+  onRemove: () => void;
+};
+
+const ColorArrayItem = memo(
+  ({
+    index,
+    colorValue,
+    channels,
+    isCollapsed,
+    onToggle,
+    onChange,
+    onRemove,
+  }: ColorArrayItemProps) => {
+    // Normalize color value
+    const normalizedColor = useMemo(() => {
+      if (Array.isArray(colorValue) && colorValue.length >= channels) {
+        const normalized = colorValue.slice(0, channels);
+        while (normalized.length < channels) {
+          normalized.push(channels === 4 && normalized.length === 3 ? 1 : 0);
+        }
+        return normalized;
+      }
+      return channels === 4 ? [0, 0, 0, 1] : [0, 0, 0];
+    }, [colorValue, channels]);
+
+    // Use useRef to track the last update time and prevent rapid-fire updates
+    const lastUpdateRef = useRef<number>(0);
+    const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Use useCallback to stabilize the onChange handler
+    const handleColorChange = useCallback(
+      (newColor: number[]) => {
+        // ColorPicker returns values in range 0-1, which is what we need
+        // Ensure we only pass the correct number of channels
+        const normalizedNewColor = newColor.slice(0, channels);
+
+        // Compare with current value to prevent unnecessary updates
+        const currentValue = Array.isArray(colorValue)
+          ? colorValue.slice(0, channels)
+          : null;
+        if (currentValue && currentValue.length === normalizedNewColor.length) {
+          const hasChanged = currentValue.some(
+            (val, idx) => Math.abs(val - normalizedNewColor[idx]) > 0.0001
+          );
+          if (!hasChanged) {
+            return; // Value hasn't changed, skip update
+          }
+        }
+
+        // Clear any pending update
+        if (pendingUpdateRef.current) {
+          clearTimeout(pendingUpdateRef.current);
+        }
+
+        // Throttle updates to prevent too frequent state changes
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastUpdateRef.current;
+
+        if (timeSinceLastUpdate > 50) {
+          // Update immediately if enough time has passed
+          lastUpdateRef.current = now;
+          onChange(normalizedNewColor);
+        } else {
+          // Debounce rapid updates
+          pendingUpdateRef.current = setTimeout(() => {
+            lastUpdateRef.current = Date.now();
+            onChange(normalizedNewColor);
+            pendingUpdateRef.current = null;
+          }, 50);
+        }
+      },
+      [onChange, channels, colorValue]
+    );
+
+    // Cleanup pending update on unmount
+    useEffect(() => {
+      return () => {
+        if (pendingUpdateRef.current) {
+          clearTimeout(pendingUpdateRef.current);
+        }
+      };
+    }, []);
+
+    const getColorPreview = (): string => {
+      if (!Array.isArray(normalizedColor) || normalizedColor.length < 3) {
+        return "No color";
+      }
+      const r = Math.round((normalizedColor[0] || 0) * 255);
+      const g = Math.round((normalizedColor[1] || 0) * 255);
+      const b = Math.round((normalizedColor[2] || 0) * 255);
+      return `rgb(${r}, ${g}, ${b})`;
+    };
+
+    const preview = getColorPreview();
+
+    return (
+      <div className="rounded-lg border border-pc-border-primary/50 bg-pc-dark overflow-hidden">
+        {/* Collapsible header - same style as ArrayField */}
+        <div className="flex items-center justify-between px-3 py-2 hover:bg-pc-darkest transition-colors">
+          <button
+            type="button"
+            onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+            onMouseUpCapture={stopReactFlowEventWithPreventDefault}
+            onClick={withStopPropagation(onToggle)}
+            className="flex items-center gap-2 flex-1 text-left group"
+          >
+            <span
+              className={cn(
+                "text-xs transition-transform",
+                isCollapsed ? "rotate-0" : "rotate-90"
+              )}
+            >
+              ▾
+            </span>
+            <span className="text-xs font-semibold text-pc-text-secondary">
+              {index + 1}.
+            </span>
+            {preview && (
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-4 h-4 rounded border border-pc-border-primary"
+                  style={{ backgroundColor: preview }}
+                />
+                <span className="text-xs text-pc-text-dark">{preview}</span>
+              </div>
+            )}
+          </button>
+          <button
+            type="button"
+            onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+            onMouseUpCapture={stopReactFlowEventWithPreventDefault}
+            onClick={withStopPropagation(onRemove)}
+            className="rounded-lg border border-pc-border-primary/60 px-2 py-1 text-xs text-pc-text-secondary hover:border-pc-error hover:text-pc-error transition-colors"
+          >
+            Remove
+          </button>
+        </div>
+        {/* Expandable content - ColorPicker */}
+        {!isCollapsed && (
+          <ColorPicker
+            value={normalizedColor}
+            onChange={handleColorChange}
+            channels={channels}
+          />
+          // <div className="px-3 pb-3 pt-2 nodrag">
+          // </div>
+        )}
+      </div>
+    );
+  }
+);
+ColorArrayItem.displayName = "ColorArrayItem";
+
+type ColorArrayFieldProps = {
+  current: unknown[];
+  onChange: (next: unknown[]) => void;
+  channels: 3 | 4;
+};
+
+const ColorArrayField = ({
+  current,
+  onChange,
+  channels,
+}: ColorArrayFieldProps) => {
+  const [collapsedItems, setCollapsedItems] = useState<Set<number>>(() => {
+    const set = new Set<number>();
+    // First item (index 0) is expanded by default, others are collapsed
+    for (let i = 1; i < current.length; i++) {
+      set.add(i);
+    }
+    return set;
+  });
+
+  useEffect(() => {
+    setCollapsedItems((prev) => {
+      const next = new Set(prev);
+      for (let i = 0; i < current.length; i++) {
+        if (!prev.has(i) && i !== 0) {
+          next.add(i);
+        }
+      }
+      for (const idx of prev) {
+        if (idx >= current.length) {
+          next.delete(idx);
+        }
+      }
+      return next;
+    });
+  }, [current.length]);
+
+  const toggleItem = (index: number) => {
+    setCollapsedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const handleItemChange = (index: number, next: unknown) => {
+    const nextValues = [...current];
+    nextValues[index] = next;
+    onChange(nextValues);
+  };
+
+  const addItem = () => {
+    // Add a default color array with correct channels
+    const defaultColor = channels === 4 ? [0, 0, 0, 1] : [0, 0, 0];
+    onChange([...current, defaultColor]);
+  };
+
+  const removeItem = (index: number) => {
+    const next = current.filter((_, idx) => idx !== index);
+    onChange(next);
+    setCollapsedItems((prev) => {
+      const next = new Set(prev);
+      next.delete(index);
+      const shifted = new Set<number>();
+      for (const idx of next) {
+        if (idx < index) {
+          shifted.add(idx);
+        } else if (idx > index) {
+          shifted.add(idx - 1);
+        }
+      }
+      return shifted;
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      {current.map((entry, index) => {
+        const colorValue = Array.isArray(entry)
+          ? entry
+          : channels === 4
+          ? [0, 0, 0, 1]
+          : [0, 0, 0];
+        const isCollapsed = collapsedItems.has(index);
+
+        return (
+          <ColorArrayItem
+            key={`color-${index}-${JSON.stringify(colorValue)}`}
+            index={index}
+            colorValue={colorValue}
+            channels={channels}
+            isCollapsed={isCollapsed}
+            onToggle={() => toggleItem(index)}
+            onChange={(nextColor) => handleItemChange(index, nextColor)}
+            onRemove={() => removeItem(index)}
+          />
+        );
+      })}
+      <button
+        type="button"
+        onPointerDownCapture={stopReactFlowEventWithPreventDefault}
+        onMouseUpCapture={stopReactFlowEventWithPreventDefault}
+        onClick={withStopPropagation(addItem)}
+        className="w-full rounded-lg border border-dashed border-pc-border-primary/60 px-3 py-2 text-sm text-pc-text-secondary hover:border-pc-text-active transition-colors"
+      >
+        + Add Color
       </button>
     </div>
   );
