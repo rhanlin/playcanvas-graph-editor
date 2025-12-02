@@ -1535,17 +1535,25 @@ const ColorArrayItem = memo(
     // Use useRef to track the last update time and prevent rapid-fire updates
     const lastUpdateRef = useRef<number>(0);
     const pendingUpdateRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Use useRef to store the latest colorValue to avoid stale closures in debounce
+    const colorValueRef = useRef<unknown>(colorValue);
+
+    // Update ref when colorValue changes
+    useEffect(() => {
+      colorValueRef.current = colorValue;
+    }, [colorValue]);
 
     // Use useCallback to stabilize the onChange handler
+    // Remove colorValue from dependencies to prevent function recreation on every color change
     const handleColorChange = useCallback(
       (newColor: number[]) => {
         // ColorPicker returns values in range 0-1, which is what we need
         // Ensure we only pass the correct number of channels
         const normalizedNewColor = newColor.slice(0, channels);
 
-        // Compare with current value to prevent unnecessary updates
-        const currentValue = Array.isArray(colorValue)
-          ? colorValue.slice(0, channels)
+        // Compare with current value using ref to get the latest value
+        const currentValue = Array.isArray(colorValueRef.current)
+          ? (colorValueRef.current as number[]).slice(0, channels)
           : null;
         if (currentValue && currentValue.length === normalizedNewColor.length) {
           const hasChanged = currentValue.some(
@@ -1556,9 +1564,10 @@ const ColorArrayItem = memo(
           }
         }
 
-        // Clear any pending update
+        // Clear any pending update and execute it immediately with the new value
         if (pendingUpdateRef.current) {
           clearTimeout(pendingUpdateRef.current);
+          pendingUpdateRef.current = null;
         }
 
         // Throttle updates to prevent too frequent state changes
@@ -1570,7 +1579,7 @@ const ColorArrayItem = memo(
           lastUpdateRef.current = now;
           onChange(normalizedNewColor);
         } else {
-          // Debounce rapid updates
+          // Debounce rapid updates - but always use the latest value
           pendingUpdateRef.current = setTimeout(() => {
             lastUpdateRef.current = Date.now();
             onChange(normalizedNewColor);
@@ -1578,7 +1587,7 @@ const ColorArrayItem = memo(
           }, 50);
         }
       },
-      [onChange, channels, colorValue]
+      [onChange, channels]
     );
 
     // Cleanup pending update on unmount
@@ -1697,6 +1706,12 @@ const ColorArrayField = ({
     });
   }, [current.length]);
 
+  // Use useRef to store the latest current array to avoid stale closures in debounce
+  const currentRef = useRef<unknown[]>(current);
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
+
   const toggleItem = (index: number) => {
     setCollapsedItems((prev) => {
       const next = new Set(prev);
@@ -1709,11 +1724,17 @@ const ColorArrayField = ({
     });
   };
 
-  const handleItemChange = (index: number, next: unknown) => {
-    const nextValues = [...current];
-    nextValues[index] = next;
-    onChange(nextValues);
-  };
+  const handleItemChange = useCallback(
+    (index: number, next: unknown) => {
+      // Use ref to get the latest current array, ensuring we always work with the most up-to-date state
+      // This prevents issues when multiple items update simultaneously with debounce
+      const latestCurrent = currentRef.current;
+      const nextValues = [...latestCurrent];
+      nextValues[index] = next;
+      onChange(nextValues);
+    },
+    [onChange]
+  );
 
   const addItem = () => {
     // Add a default color array with correct channels
@@ -1751,7 +1772,7 @@ const ColorArrayField = ({
 
         return (
           <ColorArrayItem
-            key={`color-${index}-${JSON.stringify(colorValue)}`}
+            key={`color-${index}`}
             index={index}
             colorValue={colorValue}
             channels={channels}
