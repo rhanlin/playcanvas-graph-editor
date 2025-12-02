@@ -566,8 +566,6 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
       let clickedAnchor = false;
       const currentCurveData = curveDataRef.current;
 
-      console.log("[CurvePicker] mousedown at", { x, y, time, value });
-
       currentCurveData.keys.forEach((keys, curveIndex) => {
         if (!enabledCurves[curveIndex]) return;
 
@@ -576,11 +574,6 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
           const dist = Math.sqrt((x - keyX) ** 2 + (y - keyY) ** 2);
 
           if (dist < anchorHoverRadius) {
-            console.log("[CurvePicker] clicked anchor", {
-              curveIndex,
-              keyIndex,
-              dist,
-            });
             setSelectedCurveIndex(curveIndex);
             setSelectedKeyIndex(keyIndex);
             setIsDragging(true);
@@ -591,12 +584,6 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
             selectedCurveIndexRef.current = curveIndex;
             selectedKeyIndexRef.current = keyIndex;
             isDraggingRef.current = true;
-
-            console.log("[CurvePicker] set dragging to true", {
-              curveIndex,
-              keyIndex,
-              isDraggingRef: isDraggingRef.current,
-            });
           }
         });
       });
@@ -686,12 +673,6 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
 
       // If dragging, update anchor position
       if (isDraggingRef.current && selectedKeyIndexRef.current !== null) {
-        console.log("[CurvePicker] mousemove while dragging", {
-          isDragging: isDraggingRef.current,
-          selectedKeyIndex: selectedKeyIndexRef.current,
-          x,
-          y,
-        });
         // Clamp coordinates to grid bounds (like Editor does)
         const gridLeft = padding;
         const gridRight = canvasWidth - padding;
@@ -784,11 +765,6 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     // Only handle left mouse button
     if (e.button !== 0) return;
 
-    console.log("[CurvePicker] mouseup, stopping drag", {
-      isDragging: isDraggingRef.current,
-      selectedKeyIndex: selectedKeyIndexRef.current,
-    });
-
     if (isDraggingRef.current) {
       setIsDragging(false);
       setDragStart(null);
@@ -813,13 +789,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
   // Like Editor, we always listen to mousemove and mouseup
   // Use refs in the event listeners to avoid dependency issues
   useEffect(() => {
-    console.log("[CurvePicker] Setting up event listeners");
-
     const handleMove = (e: MouseEvent) => {
-      // Add log to verify mousemove is being called
-      if (isDraggingRef.current) {
-        console.log("[CurvePicker] mousemove event received while dragging");
-      }
       handleMouseMoveRef.current(e);
     };
 
@@ -833,7 +803,6 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     window.addEventListener("mouseup", handleUp, { passive: false });
 
     return () => {
-      console.log("[CurvePicker] Cleaning up event listeners");
       window.removeEventListener("mousemove", handleMove);
       window.removeEventListener("mouseup", handleUp);
     };
