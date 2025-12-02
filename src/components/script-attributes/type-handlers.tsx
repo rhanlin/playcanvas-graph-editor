@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { WheelEvent } from "react";
 import { ColorPicker } from "@playcanvas/pcui/react";
 import { Input } from "@/components/ui/Input";
@@ -15,6 +22,7 @@ import type {
   ScriptAttributePayload,
 } from "@/types/messaging";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
+import { CurvePicker } from "./CurvePicker";
 // These components will be imported from ScriptAttributesPanel.tsx temporarily
 // TODO: Extract these to separate files for better organization
 
@@ -204,7 +212,17 @@ const colorHandler: TypeHandler = {
         type !== "json")
     );
   },
-  render: ({ value, type, definition, onChange, useState, useMemo, useCallback, useRef, useEffect }) => {
+  render: ({
+    value,
+    type,
+    definition,
+    onChange,
+    useState,
+    useMemo,
+    useCallback,
+    useRef,
+    useEffect,
+  }) => {
     const channels = type === "rgba" || definition?.color === 4 ? 4 : 3;
 
     // Memoize colorValue to prevent unnecessary re-renders
@@ -330,7 +348,13 @@ const numberHandler: TypeHandler = {
         ) : null}
         <Input
           type="number"
-          value={value ?? ""}
+          value={
+            typeof value === "number"
+              ? String(value)
+              : typeof value === "string"
+              ? value
+              : ""
+          }
           onChange={(val) => onChange(Number(val))}
           className="w-full"
         />
@@ -358,8 +382,10 @@ const vectorHandler: TypeHandler = {
       }
       return Array.from({ length: size }, () => 0);
     };
-    const min = typeof definition?.min === "number" ? definition.min : undefined;
-    const max = typeof definition?.max === "number" ? definition.max : undefined;
+    const min =
+      typeof definition?.min === "number" ? definition.min : undefined;
+    const max =
+      typeof definition?.max === "number" ? definition.max : undefined;
     const step = definition?.step || 0.1;
     const hasRange = typeof min === "number" && typeof max === "number";
     const AXIS_LABELS = ["X", "Y", "Z", "W"];
@@ -424,7 +450,18 @@ const vectorHandler: TypeHandler = {
 const entityHandler: TypeHandler = {
   priority: 40,
   match: ({ type }) => type === "entity",
-  render: ({ value, entities, entityGuid, onChange, useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef }) => {
+  render: ({
+    value,
+    entities,
+    entityGuid,
+    onChange,
+    useState,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useCallback,
+    useRef,
+  }) => {
     const [isEntityPickerOpen, setEntityPickerOpen] = useState(false);
     const [entityQuery, setEntityQuery] = useState("");
     const pickerAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -698,7 +735,15 @@ const entityHandler: TypeHandler = {
 const assetHandler: TypeHandler = {
   priority: 35,
   match: ({ type }) => type === "asset",
-  render: ({ value, definition, onChange, useState, useEffect, useMemo, useRef }) => {
+  render: ({
+    value,
+    definition,
+    onChange,
+    useState,
+    useEffect,
+    useMemo,
+    useRef,
+  }) => {
     const [isAssetPickerOpen, setAssetPickerOpen] = useState(false);
     const [assetQuery, setAssetQuery] = useState("");
     const [assets, setAssets] = useState<
@@ -1008,6 +1053,96 @@ const assetHandler: TypeHandler = {
 };
 
 /**
+ * Curve type handler (both regular curve and colorcurve)
+ * Priority: 45 (between vector and entity)
+ */
+const curveHandler: TypeHandler = {
+  priority: 45,
+  match: ({ type, definition }) => {
+    // Match 'curve' or 'colorcurve' type
+    // Also check if type is 'curve' and definition has color (for @color tag)
+    return !!(
+      type === "curve" ||
+      type === "colorcurve" ||
+      (type === "curveset" && definition?.curves !== undefined) ||
+      (definition?.type?.includes("Curve") &&
+        !definition?.type?.includes("Color[]"))
+    );
+  },
+  render: ({ value, type, definition, onChange, useMemo }) => {
+    // Determine if this is a color curve
+    const isColorCurve =
+      type === "colorcurve" ||
+      (type === "curve" && definition?.color !== undefined) ||
+      (definition?.curves && definition?.color !== undefined);
+
+    // Get curve configuration
+    // For colorcurve, curves come from definition.color (e.g., 'rgba' -> ['r', 'g', 'b', 'a'])
+    // For regular curve, curves come from definition.curves (e.g., ['Value'])
+    const curves = useMemo(() => {
+      if (isColorCurve && definition?.color) {
+        // If color is a string like 'rgba', split it into ['r', 'g', 'b', 'a']
+        if (typeof definition.color === "string") {
+          return definition.color.split("");
+        }
+        // If color is an array, use it directly
+        if (Array.isArray(definition.color)) {
+          return definition.color;
+        }
+        // Default for color curve
+        return ["r", "g", "b", "a"];
+      }
+      return definition?.curves || ["Value"];
+    }, [isColorCurve, definition?.color, definition?.curves]);
+
+    const min = definition?.min ?? (isColorCurve ? 0 : undefined);
+    const max = definition?.max ?? (isColorCurve ? 1 : undefined);
+
+    // Normalize curve value for CurvePicker
+    const curveValue = useMemo((): {
+      type: number;
+      keys: number[][] | number[];
+    } | null => {
+      if (
+        value &&
+        typeof value === "object" &&
+        "type" in value &&
+        "keys" in value
+      ) {
+        const typedValue = value as { type: unknown; keys: unknown };
+        if (
+          typeof typedValue.type === "number" &&
+          (Array.isArray(typedValue.keys) ||
+            typeof typedValue.keys === "object")
+        ) {
+          return {
+            type: typedValue.type,
+            keys: typedValue.keys as number[][] | number[],
+          };
+        }
+      }
+      // Default curve value
+      const defaultKeys = isColorCurve ? curves.map(() => [0, 0]) : [[0, 0]];
+      return {
+        type: 1, // Smooth Step
+        keys: defaultKeys,
+      };
+    }, [value, isColorCurve, curves]);
+
+    return (
+      <CurvePicker
+        value={curveValue}
+        curves={curves}
+        min={min}
+        max={max}
+        isColorCurve={isColorCurve}
+        onChange={onChange}
+      />
+    );
+  },
+};
+
+/**
  * Array type handler (array or json with array: true, but not Color[])
  * Priority: 30
  */
@@ -1029,7 +1164,7 @@ const arrayHandler: TypeHandler = {
       (type === "json" &&
         definition?.array === true &&
         definition?.color !== undefined);
-    
+
     return (
       (type === "array" || (type === "json" && definition?.array === true)) &&
       !isColorArray
@@ -1050,7 +1185,8 @@ const jsonHandler: TypeHandler = {
   priority: 20,
   match: ({ type, definition }) => {
     // Exclude arrays (handled by arrayHandler)
-    const isArray = type === "array" || (type === "json" && definition?.array === true);
+    const isArray =
+      type === "array" || (type === "json" && definition?.array === true);
     return (type === "json" || type === "object") && !isArray;
   },
   render: ({ value, onChange }) => {
@@ -1083,7 +1219,13 @@ const stringHandler: TypeHandler = {
     return (
       <Input
         type="text"
-        value={value ?? ""}
+        value={
+          typeof value === "string"
+            ? value
+            : typeof value === "number"
+            ? String(value)
+            : ""
+        }
         placeholder={definition?.placeholder}
         onChange={onChange}
         className="w-full"
@@ -1105,6 +1247,7 @@ export const TYPE_HANDLERS: TypeHandler[] = [
   booleanHandler,
   numberHandler,
   vectorHandler,
+  curveHandler,
   entityHandler,
   assetHandler,
   arrayHandler,
@@ -1120,4 +1263,3 @@ export const findTypeHandler = (
 ): TypeHandler | null => {
   return TYPE_HANDLERS.find((handler) => handler.match(params)) || null;
 };
-
