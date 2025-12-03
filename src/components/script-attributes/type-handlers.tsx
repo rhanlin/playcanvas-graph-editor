@@ -23,8 +23,7 @@ import type {
 } from "@/types/messaging";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import { CurvePicker } from "./CurvePicker";
-// These components will be imported from ScriptAttributesPanel.tsx temporarily
-// TODO: Extract these to separate files for better organization
+import { ColorArrayField } from "./ColorArrayField";
 
 /**
  * Type handler interface for polymorphic attribute input rendering.
@@ -190,9 +189,18 @@ const colorArrayHandler: TypeHandler = {
       return [];
     };
 
-    // ColorArrayField is complex and depends on components from ScriptAttributesPanel
-    // Return null to indicate this needs special handling in ScriptAttributesPanel
-    return null;
+    const normalizedValue = normalizeColorList(value);
+
+    return (
+      <ColorArrayField
+        current={normalizedValue}
+        onChange={(next) => {
+          // Ensure we maintain the 2D array structure
+          onChange(next);
+        }}
+        channels={channels}
+      />
+    );
   },
 };
 
