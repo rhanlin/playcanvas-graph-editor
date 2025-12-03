@@ -504,10 +504,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     ) {
       return;
     }
-    console.log("[GraphFocus] clearSelection", {
-      entity: state.selectedEntityGuid,
-      scriptNode: state.selectedScriptNodeId,
-    });
     set({
       selectedEntityGuid: null,
       selectedScriptNodeId: null,
@@ -1004,7 +1000,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     if (!entity) {
       return;
     }
-    console.log("[GraphFocus] focusEntity request", { entityGuid, options });
     if (!options?.preserveSelection) {
       state.clearSelection();
     }
@@ -1023,7 +1018,6 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
   },
   clearPendingFocus: () => {
     if (get().pendingFocusGuid !== null) {
-      console.log("[GraphFocus] clearPendingFocus");
       set({ pendingFocusGuid: null });
     }
   },

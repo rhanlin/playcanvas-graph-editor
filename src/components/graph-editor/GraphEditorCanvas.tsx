@@ -46,19 +46,11 @@ export function GraphEditorCanvas() {
     }
     const allNodes = reactFlowInstance.getNodes();
     const targetNode = allNodes.find((node) => node.id === pendingFocusGuid);
-    console.log("[GraphFocus] pendingFocus effect", {
-      pendingFocusGuid,
-      nodesCount: allNodes.length,
-      targetFound: !!targetNode,
-    });
     if (targetNode) {
       reactFlowInstance.fitView({
         nodes: [targetNode],
         duration: 400,
         padding: 0.2,
-      });
-      console.log("[GraphFocus] fitView executed", {
-        targetId: targetNode.id,
       });
     }
     clearPendingFocus();
