@@ -1,6 +1,6 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ColorPicker } from "@playcanvas/pcui/react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/utils/cn";
+import { ColorPickerWrapper } from "./ColorPickerWrapper";
 import {
   stopReactFlowEventWithPreventDefault,
   withStopPropagation,
@@ -118,7 +118,7 @@ export const ColorArrayItem = memo(
     const preview = getColorPreview();
 
     return (
-      <div className="rounded-lg border border-pc-border-primary/50 bg-pc-dark overflow-hidden">
+      <div className="rounded-lg border border-pc-border-primary/50 bg-pc-dark">
         {/* Collapsible header - same style as ArrayField */}
         <div className="flex items-center justify-between px-3 py-2 hover:bg-pc-darkest transition-colors">
           <button
@@ -161,7 +161,7 @@ export const ColorArrayItem = memo(
         </div>
         {/* Expandable content - ColorPicker */}
         {!isCollapsed && (
-          <ColorPicker
+          <ColorPickerWrapper
             value={normalizedColor}
             onChange={handleColorChange}
             channels={channels}
@@ -299,4 +299,3 @@ export const ColorArrayField = ({
     </div>
   );
 };
-

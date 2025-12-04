@@ -86,8 +86,31 @@ input[type="number"]::-webkit-inner-spin-button {
   margin: 0;
 }
 
+/* ColorPicker popup positioning is handled by ColorPickerWrapper */
+/* Fix: Override PCUI's inset: 0 that causes ColorPicker to fill entire Script Node height */
 .pcui-overlay:has(.pcui-color-picker),
 .pcui-overlay[class*="color"] {
   z-index: 9999 !important;
-  position: fixed !important;
+  inset: auto !important;
+}
+
+/* Fix color picker spectrum click position accuracy */
+/* Remove any transforms that might affect coordinate calculation */
+.pcui-color-picker,
+.pcui-color-picker * {
+  transform: none !important;
+}
+
+.pcui-color-picker .pcui-color-picker-spectrum,
+.pcui-color-picker .pcui-color-picker-spectrum * {
+  position: relative !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Ensure the color picker canvas/spectrum uses correct coordinate system */
+.pcui-color-picker-spectrum canvas {
+  display: block !important;
+  position: relative !important;
+  transform: none !important;
 }

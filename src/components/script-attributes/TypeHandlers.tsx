@@ -7,21 +7,14 @@ import React, {
   useState,
 } from "react";
 import type { WheelEvent } from "react";
-import { ColorPicker } from "@playcanvas/pcui/react";
+import { ColorPickerWrapper } from "./ColorPickerWrapper";
 import { Input } from "@/components/ui/Input";
 import { Slider } from "@/components/ui/Slider";
-import { cn } from "@/utils/cn";
-import {
-  stopReactFlowEvent,
-  stopReactFlowEventWithPreventDefault,
-  withStopPropagation,
-} from "@/utils/events";
+import { stopReactFlowEvent } from "@/utils/events";
 import type {
   EntityPayload,
   ScriptAttributeDefinition,
-  ScriptAttributePayload,
 } from "@/types/messaging";
-import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import { CurvePicker } from "./CurvePicker";
 import { ColorArrayField } from "./ColorArrayField";
 import { EntityPicker } from "./EntityPicker";
@@ -298,7 +291,7 @@ const colorHandler: TypeHandler = {
     }, []);
 
     return (
-      <ColorPicker
+      <ColorPickerWrapper
         value={colorValue}
         onChange={handleColorChange}
         channels={channels}
