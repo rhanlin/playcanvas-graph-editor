@@ -140,6 +140,7 @@ const AttributeField = ({
             id={attributeName}
             className="absolute -right-2 top-1/2 h-3 w-3 bg-pc-text-active"
             style={{ transform: "translateY(-50%)" }}
+            onConnect={(params) => {}}
           />
         ) : null}
       </div>

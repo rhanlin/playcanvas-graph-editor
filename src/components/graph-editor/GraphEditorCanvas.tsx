@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
   useReactFlow,
+  useUpdateNodeInternals,
   type Node,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -35,10 +36,57 @@ export function GraphEditorCanvas() {
     rootGuid,
     pendingFocusGuid,
     clearPendingFocus,
+    scriptPanelState,
   } = useGraphEditorStore();
   const reactFlowInstance = useReactFlow();
+  const updateNodeInternals = useUpdateNodeInternals();
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHoverTargetRef = useRef<string | null>(null);
+  const previousScriptPanelStateRef = useRef<Record<string, boolean>>({});
+
+  // Force React Flow to update node internals when Script Nodes are expanded
+  // This ensures edges are visible when Handles appear
+  useLayoutEffect(() => {
+    const previousState = previousScriptPanelStateRef.current;
+    const currentState = scriptPanelState;
+
+    // Find script nodes that just became expanded (were collapsed, now expanded)
+    const newlyExpandedNodes: string[] = [];
+
+    // Check nodes that are now expanded but weren't before
+    Object.keys(currentState).forEach((nodeId) => {
+      const wasCollapsed = previousState[nodeId] !== false; // undefined or true means collapsed
+      const isExpanded = currentState[nodeId] === false; // false means expanded
+      if (isExpanded && wasCollapsed) {
+        newlyExpandedNodes.push(nodeId);
+      }
+    });
+
+    // Also check nodes that exist in current state but not in previous
+    Object.keys(currentState).forEach((nodeId) => {
+      if (!(nodeId in previousState) && currentState[nodeId] === false) {
+        newlyExpandedNodes.push(nodeId);
+      }
+    });
+
+    // Update internals only for newly expanded nodes
+    if (newlyExpandedNodes.length > 0) {
+      // Wait for DOM to update (Handles to render)
+      const timeoutId = setTimeout(() => {
+        newlyExpandedNodes.forEach((nodeId) => {
+          updateNodeInternals(nodeId);
+        });
+      }, 0);
+
+      // Update ref for next comparison
+      previousScriptPanelStateRef.current = { ...currentState };
+
+      return () => clearTimeout(timeoutId);
+    } else {
+      // Update ref even if no changes, to track current state
+      previousScriptPanelStateRef.current = { ...currentState };
+    }
+  }, [scriptPanelState, updateNodeInternals]);
 
   useEffect(() => {
     if (!pendingFocusGuid) {

@@ -674,10 +674,12 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
     if (!scriptNodeId) return;
     set((state) => {
       const current = !!state.scriptPanelState[scriptNodeId];
+      const willBeExpanded = !current;
+
       return {
         scriptPanelState: {
           ...state.scriptPanelState,
-          [scriptNodeId]: !current,
+          [scriptNodeId]: willBeExpanded,
         },
       };
     });
