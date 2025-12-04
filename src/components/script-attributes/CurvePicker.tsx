@@ -33,7 +33,7 @@ interface CurveKey {
 
 interface CurveData {
   type: number;
-  keys: CurveKey[];
+  keys: CurveKey[][];
 }
 
 interface CurvePickerProps {
@@ -69,6 +69,9 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
   const [enabledCurves, setEnabledCurves] = useState<boolean[]>(
     new Array(curves.length).fill(true)
   );
+
+  // Local state for dragging - used to show immediate feedback without waiting for store update
+  const [localCurveData, setLocalCurveData] = useState<CurveData | null>(null);
 
   // Normalize value to CurveData format
   const curveData = useMemo(() => {
@@ -123,8 +126,12 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     return { type, keys };
   }, [value, curves]);
 
+  // Use local curve data if dragging, otherwise use normalized value
+  const displayCurveData: CurveData =
+    isDragging && localCurveData ? localCurveData : curveData;
+
   // Use refs to store latest values for drag operations
-  const curveDataRef = useRef(curveData);
+  const curveDataRef = useRef(displayCurveData);
   const selectedCurveIndexRef = useRef(selectedCurveIndex);
   const selectedKeyIndexRef = useRef<number | null>(selectedKeyIndex);
   const hoveredCurveIndexRef = useRef<number | null>(null);
@@ -140,8 +147,15 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
 
   // Keep refs in sync with state
   useEffect(() => {
-    curveDataRef.current = curveData;
-  }, [curveData]);
+    curveDataRef.current = displayCurveData;
+  }, [displayCurveData]);
+
+  // Reset local curve data when dragging ends
+  useEffect(() => {
+    if (!isDragging && localCurveData) {
+      setLocalCurveData(null);
+    }
+  }, [isDragging, localCurveData]);
 
   useEffect(() => {
     selectedCurveIndexRef.current = selectedCurveIndex;
@@ -213,7 +227,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     }
 
     return { min: rangeMin, max: rangeMax };
-  }, [curveData.keys, min, max]);
+  }, [displayCurveData.keys, min, max]);
 
   const valueMin = actualValueRange.min;
   const valueMax = actualValueRange.max;
@@ -405,7 +419,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     }
 
     // Draw curves
-    curveData.keys.forEach((keys, index) => {
+    displayCurveData.keys.forEach((keys, index) => {
       if (enabledCurves[index] && keys.length > 0) {
         const color = CURVE_COLORS[index % CURVE_COLORS.length];
         drawCurve(ctx, keys, color, curveType);
@@ -413,7 +427,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     });
 
     // Draw anchors (control points) - draw normal anchors first
-    curveData.keys.forEach((keys, curveIndex) => {
+    displayCurveData.keys.forEach((keys, curveIndex) => {
       if (enabledCurves[curveIndex]) {
         const color = CURVE_COLORS[curveIndex % CURVE_COLORS.length];
         keys.forEach((key, keyIndex) => {
@@ -438,7 +452,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     });
 
     // Draw hovered and selected anchors on top (like Editor does)
-    curveData.keys.forEach((keys, curveIndex) => {
+    displayCurveData.keys.forEach((keys, curveIndex) => {
       if (enabledCurves[curveIndex]) {
         const color = CURVE_COLORS[curveIndex % CURVE_COLORS.length];
         keys.forEach((key, keyIndex) => {
@@ -461,7 +475,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
       }
     });
   }, [
-    curveData,
+    displayCurveData,
     enabledCurves,
     selectedCurveIndex,
     selectedKeyIndex,
@@ -518,7 +532,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
-  }, [isColorCurve, curveData, curveType, interpolateCurve]);
+  }, [isColorCurve, displayCurveData, curveType, interpolateCurve]);
 
   // Update curve value
   const updateCurveValue = useCallback(() => {
@@ -719,14 +733,16 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
             );
             updatedKeys[currentCurveIndex] = curveKeys;
 
-            // Update value
-            const keys: number[][] = updatedKeys.map((curveKeys) =>
-              curveKeys.flatMap((key) => [key.time, key.value])
-            );
-            onChange({
+            // Update local state immediately for visual feedback
+            const updatedCurveData: CurveData = {
               type: curveType,
-              keys: keys.length === 1 ? keys[0] : keys,
-            });
+              keys: updatedKeys,
+            };
+            setLocalCurveData(updatedCurveData);
+            curveDataRef.current = updatedCurveData;
+
+            // Don't call onChange during drag - only update on mouseup
+            // This prevents the laggy feeling from store updates
 
             if (newKeyIndex >= 0) {
               setSelectedKeyIndex(newKeyIndex);
@@ -761,16 +777,30 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
   );
 
   // Handle mouse up
-  const handleMouseUp = useCallback((e: MouseEvent) => {
-    // Only handle left mouse button
-    if (e.button !== 0) return;
+  const handleMouseUp = useCallback(
+    (e: MouseEvent) => {
+      // Only handle left mouse button
+      if (e.button !== 0) return;
 
-    if (isDraggingRef.current) {
-      setIsDragging(false);
-      setDragStart(null);
-      isDraggingRef.current = false;
-    }
-  }, []);
+      if (isDraggingRef.current) {
+        // Update store with final position when drag ends
+        if (localCurveData) {
+          const keys: number[][] = localCurveData.keys.map((curveKeys) =>
+            curveKeys.flatMap((key) => [key.time, key.value])
+          );
+          onChange({
+            type: localCurveData.type,
+            keys: keys.length === 1 ? keys[0] : keys,
+          });
+        }
+
+        setIsDragging(false);
+        setDragStart(null);
+        isDraggingRef.current = false;
+      }
+    },
+    [localCurveData, onChange]
+  );
 
   // Store handlers in refs to avoid recreating event listeners
   const handleMouseMoveRef = useRef(handleMouseMove);
@@ -812,6 +842,11 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
   useEffect(() => {
     render();
   }, [render]);
+
+  // Also render when displayCurveData changes directly (in case render dependency doesn't catch it)
+  useEffect(() => {
+    render();
+  }, [displayCurveData, render]);
 
   useEffect(() => {
     renderGradient();
@@ -857,11 +892,17 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
 
       setSelectedKeyIndex(null);
     }
-  }, [selectedKeyIndex, selectedCurveIndex, curveData, curveType, onChange]);
+  }, [
+    selectedKeyIndex,
+    selectedCurveIndex,
+    displayCurveData,
+    curveType,
+    onChange,
+  ]);
 
   // Handle reset curve
   const handleResetCurve = useCallback(() => {
-    const updatedKeys = [...curveData.keys];
+    const updatedKeys = [...displayCurveData.keys];
     updatedKeys[selectedCurveIndex] = [{ time: 0, value: 0 }];
 
     const keys: number[][] = updatedKeys.map((curveKeys) =>
@@ -873,7 +914,7 @@ export const CurvePicker: React.FC<CurvePickerProps> = ({
     });
 
     setSelectedKeyIndex(null);
-  }, [selectedCurveIndex, curveData, curveType, onChange]);
+  }, [selectedCurveIndex, displayCurveData, curveType, onChange]);
 
   return (
     <div
