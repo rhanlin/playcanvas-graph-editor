@@ -22,13 +22,6 @@ type InputProps = Omit<
   allowCancel?: boolean;
 };
 
-/**
- * Unified Input component with consistent behavior across the extension:
- * - React Flow event handling
- * - Enter to save, ESC to cancel (for text inputs with deferUpdate)
- * - Automatic blur save
- * - Consistent styling
- */
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
     {

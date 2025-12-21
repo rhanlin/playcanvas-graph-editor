@@ -26,6 +26,31 @@ I use [pnpm](https://pnpm.io) for dependency management.
 pnpm install
 ```
 
+### Project Structure
+
+Here's an overview of the project structure to help you get oriented:
+
+```
+src
+├── components
+│   ├── graph-editor     # React Flow graph components (nodes, canvas)
+│   ├── script-attributes # Specialized attribute editors (CurvePicker, ColorPicker, etc.)
+│   └── ui               # Shared UI components (Input, Slider, etc.)
+├── content
+│   └── index.ts         # Chrome Extension content script (injected into page)
+├── stores               # Zustand state management
+├── utils                # Helper functions (runtime comms, graph layout)
+└── types                # TypeScript type definitions
+```
+
+- **`src/content/index.ts`**: The entry point for the content script. It injects the `editor-bridge.js` into the PlayCanvas Editor page to establish communication.
+- **`public/editor-bridge.js`**: This script is injected directly into the web page's context.
+  - **Role**: It acts as a bridge between the Chrome Extension and the PlayCanvas Editor's internal API (`window.editor`).
+  - **Functionality**: Accesses scene graph data, listens for editor events (selection, updates), and handles commands from the extension (like reparenting or updating attributes).
+  - **Communication**: Uses `window.postMessage` to send data back to `content/index.ts`.
+- **`src/stores/useGraphEditorStore.ts`**: The central store managing the application state (nodes, edges, selection, etc.).
+- **`src/components/script-attributes/TypeHandlers.tsx`**: The registry for attribute type handlers (Strategy Pattern), determining how different attribute types are rendered.
+
 ### Development Workflow
 
 1.  **Make changes** to the codebase.
