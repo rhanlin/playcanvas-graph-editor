@@ -1,6 +1,8 @@
 {
-  "name": "poc-graph-editor",
-  "version": "1.0.0",
+  "name": "playcanvas-graph-editor",
+  "version": "0.0.1",
+  "author": "Rhan0 <rhan0.0819@gmail.com>",
+  "homepage": "https://github.com/rhanlin/playcanvas-graph-editor",
   "description": "Standalone PlayCanvas visual graph editor extension",
   "main": "src/main.ts",
   "type": "module",
@@ -16,7 +18,10 @@
     "graph-editor",
     "chrome-extension"
   ],
-  "author": "",
+  "repository": "https://github.com/rhanlin/playcanvas-graph-editor",
+  "bugs": {
+    "url": "https://github.com/rhanlin/playcanvas-graph-editor/issues"
+  },
   "license": "MIT",
   "packageManager": "pnpm@10.18.3",
   "dependencies": {
