@@ -48,7 +48,7 @@ A Chrome Extension for PlayCanvas that transforms scene management with a visual
 
 1.  **Install the Extension**:
 
-    - Download the latest release (`dist.zip`) from the [Releases page](https://github.com/rhanlin/playcanvas-graph-editor/releases).
+    - Download the latest release (`PlayCanvas-Graph-Editor.zip`) from the [Releases page](https://github.com/rhanlin/playcanvas-graph-editor/releases).
     - Unzip the file.
     - Open `chrome://extensions/` in Chrome.
     - Enable "Developer mode".
