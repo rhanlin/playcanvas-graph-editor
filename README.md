@@ -13,9 +13,8 @@ A Chrome Extension for PlayCanvas that transforms scene management with a visual
 
 - **Visual Scene Graph**: Interactive node-based view of your Entity hierarchy with drag-and-drop support.
 - **Advanced Attribute Editors**:
-  - **Curve Picker**: Full-featured animation curve editor.
-  - **Color Picker**: Enhanced RGBA color selection.
-  - **Visual Selectors**: Connection lines for Entity and Asset references.
+  - **Optimized Array Input**: Enhanced UI Component for handling array data structures.
+  - **Visual Selectors**: Connection lines for Entity and Asset references to visualize data flow.
 - **Bi-directional Sync**: Real-time synchronization with PlayCanvas Editor.
 - **Live Updates**: Instantly reflects selection, property changes, and structural updates.
 
@@ -47,13 +46,21 @@ A Chrome Extension for PlayCanvas that transforms scene management with a visual
 
 ## Usage
 
-1.  Open your PlayCanvas Editor project.
-2.  Open Chrome Developer Tools (F12 or Cmd+Option+I).
-3.  Navigate to the **Graph Editor** tab.
-4.  **Interact**:
-    - **Pan/Zoom**: Navigate the graph space.
-    - **Select**: Click nodes to select entities in the main Editor.
-    - **Edit**: Expand nodes to use the enhanced attribute editors.
+1.  **Install the Extension**:
+
+    - Download the latest release (`dist.zip`) from the [Releases page](https://github.com/rhanlin/playcanvas-graph-editor/releases).
+    - Unzip the file.
+    - Open `chrome://extensions/` in Chrome.
+    - Enable "Developer mode".
+    - Click "Load unpacked" and select the unzipped folder.
+
+2.  **Open PlayCanvas Editor**:
+
+    - Navigate to your PlayCanvas project editor.
+
+3.  **Launch Graph Editor**:
+    - Click **"PlayCanvas Graphics Editor"** through the browser extension will automatically open a tab.
+    - Enjoy the features.
 
 ## Tech Stack
 
