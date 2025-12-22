@@ -220,9 +220,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     message?.type === "GRAPH_UPDATE_ATTRIBUTE" ||
     message?.type === "GRAPH_SET_COLLAPSE_STATE" ||
     message?.type === "GRAPH_REPARENT_ENTITY" ||
-    message?.type === "GRAPH_FOCUS_ENTITY"
+    message?.type === "GRAPH_FOCUS_ENTITY" ||
+    message?.type === "GRAPH_ADD_ENTITY"
   ) {
     window.postMessage(message, "*");
+    sendResponse({ success: true });
     return false;
   }
 
