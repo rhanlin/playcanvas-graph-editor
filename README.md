@@ -1,4 +1,7 @@
-# PlayCanvas Visual Graph Editor
+<div align="center">
+  <img src="public/images/icon128.png" alt="Logo" width="128" height="128">
+  <h1>PlayCanvas Visual Graph Editor</h1>
+</div>
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)
@@ -7,7 +10,7 @@
 
 A Chrome Extension for PlayCanvas that transforms scene management with a visual node graph and advanced attribute editors.
 
-![Demo](public/images/pc-graph-editor.webp)
+![Demo](public/images/pc-graph-editor-demo.gif)
 
 ## Features
 
@@ -17,6 +20,8 @@ A Chrome Extension for PlayCanvas that transforms scene management with a visual
   - **Visual Selectors**: Connection lines for Entity and Asset references to visualize data flow.
 - **Bi-directional Sync**: Real-time synchronization with PlayCanvas Editor.
 - **Live Updates**: Instantly reflects selection, property changes, and structural updates.
+
+![Features](public/images/pc-graph-editor.webp)
 
 ## Installation
 
