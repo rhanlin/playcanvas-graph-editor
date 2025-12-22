@@ -691,11 +691,7 @@
 
     editor.call("selector:set", "entity", [entity]);
     setTimeout(() => {
-      try {
-        editor.call("viewport:focus");
-      } catch (error) {
-        console.error("[GraphBridge] Failed to focus viewport", error);
-      }
+      editor.call("viewport:focus");
     }, 0);
   }
 
@@ -796,6 +792,10 @@
       if (newEntity) {
         // Select the new entity
         editor.call("selector:set", "entity", [newEntity]);
+        // Focus on the new entity
+        setTimeout(() => {
+          editor.call("viewport:focus");
+        }, 0);
       }
     } catch (error) {
       console.error("[GraphBridge] Failed to add entity", error);
