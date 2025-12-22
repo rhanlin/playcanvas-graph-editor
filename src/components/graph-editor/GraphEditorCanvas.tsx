@@ -124,8 +124,18 @@ export function GraphEditorCanvas() {
     clearPendingFocus();
   }, [pendingFocusGuid, reactFlowInstance, clearPendingFocus]);
 
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    handleCloseContextMenu();
+  }, [handleCloseContextMenu]);
+
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      handleCloseContextMenu();
+
       // onNodesChange already handles selection state and notifies the editor
       // This is just a backup notification in case onNodesChange didn't catch it
       // (which shouldn't happen, but we keep it for safety)
@@ -142,7 +152,7 @@ export function GraphEditorCanvas() {
         );
       }
     },
-    [setSelectedEntity, nodes]
+    [setSelectedEntity, nodes, handleCloseContextMenu]
   );
 
   const checkIsDescendant = useCallback(
@@ -440,10 +450,6 @@ export function GraphEditorCanvas() {
     []
   );
 
-  const handleCloseContextMenu = useCallback(() => {
-    setContextMenu((prev) => ({ ...prev, isOpen: false }));
-  }, []);
-
   const handleAddEntity = useCallback(() => {
     addEntity(contextMenu.targetNodeId);
     handleCloseContextMenu();
@@ -459,6 +465,7 @@ export function GraphEditorCanvas() {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onPaneContextMenu={onPaneContextMenu}

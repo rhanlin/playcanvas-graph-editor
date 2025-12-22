@@ -36,7 +36,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       ref={ref}
       style={{ top: y, left: x }}
       className={cn(
-        "absolute z-50 min-w-[160px] overflow-hidden rounded-md border border-pc-border-primary bg-pc-darker shadow-lg",
+        "fixed z-50 min-w-[160px] overflow-hidden rounded-md border border-pc-border-primary bg-pc-darker shadow-lg",
         "flex flex-col py-1"
       )}
     >
