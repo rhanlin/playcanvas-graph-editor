@@ -15,6 +15,7 @@ A Chrome Extension for PlayCanvas that transforms scene management with a visual
 ## Features
 
 - **Visual Scene Graph**: Interactive node-based view of your Entity hierarchy with drag-and-drop support.
+- **Context Menu Actions**: Right-click to quickly create new Entity at the root or as children of existing nodes.
 - **Advanced Attribute Editors**:
   - **Optimized Array Input**: Enhanced UI Component for handling array data structures.
   - **Visual Selectors**: Connection lines for Entity and Asset references to visualize data flow.

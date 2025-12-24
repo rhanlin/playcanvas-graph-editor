@@ -691,11 +691,7 @@
 
     editor.call("selector:set", "entity", [entity]);
     setTimeout(() => {
-      try {
-        editor.call("viewport:focus");
-      } catch (error) {
-        console.error("[GraphBridge] Failed to focus viewport", error);
-      }
+      editor.call("viewport:focus");
     }, 0);
   }
 
@@ -764,6 +760,45 @@
       );
     } catch (error) {
       console.error("[GraphBridge] Failed to reparent entity", error);
+    }
+  }
+
+  function handleAddEntityRequest(payload) {
+    const editor = window.editor;
+    if (!editor) {
+      return;
+    }
+
+    const { parentGuid, name } = payload || {};
+    let parent = null;
+
+    if (parentGuid) {
+      parent = editor.call("entities:get", parentGuid);
+      if (!parent) {
+        console.warn(
+          `[GraphBridge] Parent entity ${parentGuid} not found, adding to root`
+        );
+      }
+    }
+
+    try {
+      const newEntityData = {
+        name: name || "New Entity",
+        parent: parent, // can be null/undefined
+      };
+
+      const newEntity = editor.call("entities:new", newEntityData);
+
+      if (newEntity) {
+        // Select the new entity
+        editor.call("selector:set", "entity", [newEntity]);
+        // Focus on the new entity
+        setTimeout(() => {
+          editor.call("viewport:focus");
+        }, 0);
+      }
+    } catch (error) {
+      console.error("[GraphBridge] Failed to add entity", error);
     }
   }
 
@@ -1075,6 +1110,15 @@
         handleReparentRequest(payload);
       } catch (e) {
         console.error("[GraphBridge] Failed to handle reparent request:", e);
+      }
+      return;
+    }
+
+    if (type === "GRAPH_ADD_ENTITY") {
+      try {
+        handleAddEntityRequest(payload);
+      } catch (e) {
+        console.error("[GraphBridge] Failed to handle add entity request:", e);
       }
       return;
     }

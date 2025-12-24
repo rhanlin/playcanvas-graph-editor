@@ -86,6 +86,7 @@ interface GraphEditorState {
   ) => void;
   toggleEntityCollapse: (guid: string) => void;
   upsertEntity: (entity: EntityPayload) => void;
+  addEntity: (parentGuid: string | null) => void;
   removeEntity: (guid: string) => void;
   focusEntity: (entityGuid: string, options?: FocusOptions) => void;
   clearPendingFocus: () => void;
@@ -350,8 +351,11 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       sendRuntimeMessage({
         type: "GRAPH_SET_SELECTION",
         payload: { entityGuid: currentEntityGuid },
-      }).catch(() => {
-        // ignore errors when content script isn't ready
+      }).catch((error) => {
+        console.error(
+          "[GraphStore] Failed to sync selection to editor:",
+          error
+        );
       });
     }
   },
@@ -491,8 +495,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       sendRuntimeMessage({
         type: "GRAPH_SET_SELECTION",
         payload: { entityGuid: guid },
-      }).catch(() => {
-        // Ignore communication errors
+      }).catch((error) => {
+        console.error("[GraphStore] Failed to broadcast selection:", error);
       });
     }
   },
@@ -577,7 +581,9 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       sendRuntimeMessage({
         type: "GRAPH_SET_COLLAPSE_STATE",
         payload: { entityGuid: guid, collapsed },
-      }).catch(() => {});
+      }).catch((error) => {
+        console.error("[GraphStore] Failed to sync collapse state:", error);
+      });
     }
   },
   applyCollapseStateUpdate: (guid, collapsed) => {
@@ -654,8 +660,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
           typeof options.insertIndex === "number" ? options.insertIndex : null,
         preserveTransform: options.preserveTransform !== false,
       },
-    }).catch(() => {
-      // ignore connection errors
+    }).catch((error) => {
+      console.error("[GraphStore] Failed to reparent entity:", error);
     });
 
     // Clear preview state after reparent
@@ -795,8 +801,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
           attributeName,
           value,
         },
-      }).catch(() => {
-        // silently ignore connection errors
+      }).catch((error) => {
+        console.error("[GraphStore] Failed to update attribute:", error);
       });
     }
   },
@@ -855,6 +861,17 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
         isLoading: false,
         error: null,
       };
+    });
+  },
+  addEntity: (parentGuid) => {
+    sendRuntimeMessage({
+      type: "GRAPH_ADD_ENTITY",
+      payload: {
+        parentGuid,
+        name: "New Entity",
+      },
+    }).catch((error) => {
+      console.error("[GraphStore] Failed to add entity:", error);
     });
   },
   removeEntity: (guid) => {
@@ -1013,8 +1030,8 @@ export const useGraphEditorStore = create<GraphEditorState>((set, get) => ({
       sendRuntimeMessage({
         type: "GRAPH_FOCUS_ENTITY",
         payload: { entityGuid },
-      }).catch(() => {
-        // ignore errors if editor tab not reachable
+      }).catch((error) => {
+        console.error("[GraphStore] Failed to focus entity:", error);
       });
     }
   },

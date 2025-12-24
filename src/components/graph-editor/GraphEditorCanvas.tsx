@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ReactFlow,
   Background,
@@ -13,6 +19,7 @@ import "reactflow/dist/style.css";
 import { useGraphEditorStore } from "@/stores/useGraphEditorStore";
 import { EntityNode } from "./nodes/EntityNode";
 import { ScriptNode } from "./nodes/ScriptNode";
+import { ContextMenu } from "./ContextMenu";
 
 const nodeTypes = {
   entity: EntityNode,
@@ -32,6 +39,7 @@ export function GraphEditorCanvas() {
     clearScriptAttribute,
     setReparentPreview,
     reparentEntity,
+    addEntity,
     entities,
     rootGuid,
     pendingFocusGuid,
@@ -43,6 +51,18 @@ export function GraphEditorCanvas() {
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHoverTargetRef = useRef<string | null>(null);
   const previousScriptPanelStateRef = useRef<Record<string, boolean>>({});
+
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    targetNodeId: string | null;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    targetNodeId: null,
+  });
 
   // Force React Flow to update node internals when Script Nodes are expanded
   // This ensures edges are visible when Handles appear
@@ -104,8 +124,18 @@ export function GraphEditorCanvas() {
     clearPendingFocus();
   }, [pendingFocusGuid, reactFlowInstance, clearPendingFocus]);
 
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const onPaneClick = useCallback(() => {
+    handleCloseContextMenu();
+  }, [handleCloseContextMenu]);
+
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
+      handleCloseContextMenu();
+
       // onNodesChange already handles selection state and notifies the editor
       // This is just a backup notification in case onNodesChange didn't catch it
       // (which shouldn't happen, but we keep it for safety)
@@ -122,7 +152,7 @@ export function GraphEditorCanvas() {
         );
       }
     },
-    [setSelectedEntity, nodes]
+    [setSelectedEntity, nodes, handleCloseContextMenu]
   );
 
   const checkIsDescendant = useCallback(
@@ -393,34 +423,80 @@ export function GraphEditorCanvas() {
     []
   );
 
+  const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      x: event.clientX,
+      y: event.clientY,
+      targetNodeId: null, // null means Root
+    });
+  }, []);
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      // Only allow adding children to Entity Nodes
+      if (node.type !== "entity") {
+        return;
+      }
+      event.preventDefault();
+      setContextMenu({
+        isOpen: true,
+        x: event.clientX,
+        y: event.clientY,
+        targetNodeId: node.id,
+      });
+    },
+    []
+  );
+
+  const handleAddEntity = useCallback(() => {
+    addEntity(contextMenu.targetNodeId);
+    handleCloseContextMenu();
+  }, [addEntity, contextMenu.targetNodeId, handleCloseContextMenu]);
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      onNodeClick={onNodeClick}
-      onNodeDrag={onNodeDrag}
-      onNodeDragStop={onNodeDragStop}
-      className="h-full bg-pc-darker"
-      connectionRadius={40}
-      fitView
-    >
-      <Background />
-      <Controls className="pc-controls" position="bottom-left" />
-      <MiniMap
-        className="pc-minimap"
-        style={{ background: "#2c393c" }}
-        nodeBorderRadius={8}
-        nodeStrokeWidth={1.5}
-        nodeStrokeColor={minimapNodeStrokeColor}
-        nodeColor={minimapNodeColor}
-        nodeClassName={minimapNodeClassName}
-        pannable
-        zoomable
-      />
-    </ReactFlow>
+    <>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
+        onPaneContextMenu={onPaneContextMenu}
+        onNodeContextMenu={onNodeContextMenu}
+        className="h-full bg-pc-darker"
+        connectionRadius={40}
+        fitView
+      >
+        <Background />
+        <Controls className="pc-controls" position="bottom-left" />
+        <MiniMap
+          className="pc-minimap"
+          style={{ background: "#2c393c" }}
+          nodeBorderRadius={8}
+          nodeStrokeWidth={1.5}
+          nodeStrokeColor={minimapNodeStrokeColor}
+          nodeColor={minimapNodeColor}
+          nodeClassName={minimapNodeClassName}
+          pannable
+          zoomable
+        />
+      </ReactFlow>
+      {contextMenu.isOpen && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          targetNodeId={contextMenu.targetNodeId}
+          onAddEntity={handleAddEntity}
+          onClose={handleCloseContextMenu}
+        />
+      )}
+    </>
   );
 }
