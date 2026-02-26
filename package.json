@@ -1,6 +1,6 @@
 {
   "name": "playcanvas-graph-editor",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "author": "Rhan0 <rhan0.0819@gmail.com>",
   "homepage": "https://github.com/rhanlin/playcanvas-graph-editor",
   "description": "Standalone PlayCanvas visual graph editor extension",
